@@ -1,5 +1,4 @@
 {
-  "enabledPlugins": {
-    "expo@claude-plugins-official": true
-  }
+  "files.encoding": "utf8",
+  "files.autoGuessEncoding": false
 }
