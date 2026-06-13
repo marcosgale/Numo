@@ -6,7 +6,9 @@
 -- Perfiles de usuario (extiende auth.users de Supabase)
 create table public.profiles (
   id uuid references auth.users(id) on delete cascade primary key,
-  full_name text,
+  first_name text,
+  last_name text,
+  birth_date date,
   avatar_url text,
   currency text default 'EUR',
   created_at timestamptz default now()
