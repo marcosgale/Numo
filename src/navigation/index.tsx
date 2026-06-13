@@ -4,7 +4,6 @@ import { Home, Users, Target, User } from 'lucide-react-native';
 import { View, Text } from 'react-native';
 import { Colors } from '../constants/theme';
 import DashboardScreen from '../screens/DashboardScreen';
-import RegisterScreen from '../screens/RegisterScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -55,7 +54,7 @@ export default function Navigation() {
         />
         <Tab.Screen
           name="Perfil"
-          component={RegisterScreen}
+          children={() => <PlaceholderScreen name="Perfil" />}
           options={{
             tabBarIcon: ({ color }) => <User size={22} color={color} />,
           }}

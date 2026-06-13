@@ -1,9 +1,7 @@
-import { useEffect } from 'react'; // ← NUEVO
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, ShoppingCart, UtensilsCrossed } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
-import { supabase } from '../services/supabase'; // ← NUEVO
 
 const friends = [
   { name: 'Laura', initials: 'LA', amount: '+23,50€', positive: true, color: '#1DB87A' },
@@ -23,17 +21,6 @@ const transactions = [
 ];
 
 export default function DashboardScreen() {
-  // ← NUEVO: prueba de conexión con Supabase
-  useEffect(() => {
-    const testConnection = async () => {
-      const { data, error } = await supabase.from('profiles').select('*');
-      console.log('DATA:', data);
-      console.log('ERROR:', error);
-    };
-    testConnection();
-  }, []);
-  // ← FIN NUEVO
-
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
