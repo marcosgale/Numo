@@ -1,61 +1,62 @@
-import { useState } from 'react'; // useState: el hermano de useEffect. Guarda datos que CAMBIAN (lo que el usuario teclea)
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 
 export default function RegisterScreen() {
-  // Cada useState crea una "cajita" con un valor y su función para cambiarlo:
-  const [email, setEmail] = useState('');       // empieza vacío
-  const [password, setPassword] = useState(''); // empieza vacío
-  const [loading, setLoading] = useState(false); // para desactivar el botón mientras se registra
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    setLoading(true); // botón a "cargando"
+    setLoading(true);
     const { error } = await supabase.auth.signUp({ email, password });
     setLoading(false);
 
     if (error) {
-      Alert.alert('Error', error.message); // popup nativo del iPhone
+      Alert.alert('Error', error.message);
     } else {
       Alert.alert('¡Cuenta creada!', 'Ya puedes usar Numo');
     }
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
-        <Text style={styles.title}>Crear cuenta</Text>
-        <Text style={styles.subtitle}>Empieza a controlar tus finanzas</Text>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.container}>
+          <Text style={styles.title}>Crear cuenta</Text>
+          <Text style={styles.subtitle}>Empieza a controlar tus finanzas</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={Colors.textSecondary}
-          value={email}                  // el input MUESTRA lo que hay en la cajita
-          onChangeText={setEmail}        // y cada tecla ACTUALIZA la cajita
-          autoCapitalize="none"          // emails sin mayúscula automática
-          keyboardType="email-address"   // teclado con @ visible
-        />
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            placeholderTextColor={Colors.textSecondary}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          placeholderTextColor={Colors.textSecondary}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry                // puntitos en vez de letras
-        />
+          <TextInput
+            style={styles.input}
+            placeholder="Contraseña"
+            placeholderTextColor={Colors.textSecondary}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
 
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleRegister}
-          disabled={loading}             // no se puede pulsar dos veces
-        >
-          <Text style={styles.buttonText}>{loading ? 'Creando...' : 'Registrarme'}</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleRegister}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>{loading ? 'Creando...' : 'Registrarme'}</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
 }
 
