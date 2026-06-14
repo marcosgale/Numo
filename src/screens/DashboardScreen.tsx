@@ -1,26 +1,121 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, ShoppingCart, UtensilsCrossed } from 'lucide-react-native';
+import { Bell } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { supabase } from '../services/supabase';
+import { useFocusEffect } from '@react-navigation/native';
 
-const friends = [
-  { name: 'Laura', initials: 'LA', amount: '+23,50€', positive: true, color: '#1DB87A' },
-  { name: 'Marcos', initials: 'MA', amount: '+47,00€', positive: true, color: '#9B59B6' },
-  { name: 'Sonia', initials: 'SO', amount: '-15,00€', positive: false, color: '#F39C12' },
-  { name: 'Iván', initials: 'IV', amount: '+8,00€', positive: true, color: '#3498DB' },
-];
-
-const limits = [
-  { name: 'Transporte', spent: 76, limit: 80, pct: 95, color: Colors.negative },
-  { name: 'Restaurantes', spent: 145, limit: 200, pct: 72, color: Colors.warning },
-];
-
-const transactions = [
-  { name: 'Mercadona', category: 'Compras · Hoy', amount: '-34,50€', icon: 'cart' },
-  { name: 'Café Gijón', category: 'Restaurantes · Ayer', amount: '-4,80€', icon: 'food' },
-];
+type Transaction = {
+  id: string;
+  amount: number;
+  type: string;
+  description: string | null;
+  date: string;
+  is_recurring: boolean;
+  currency: string;
+  categories: {
+    name: string;
+    icon: string;
+    color: string;
+  } | null;
+};
 
 export default function DashboardScreen() {
+  const [firstName, setFirstName] = useState('');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [monthIncome, setMonthIncome] = useState(0);
+  const [monthExpenses, setMonthExpenses] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Buenos días,';
+    if (hour < 20) return 'Buenas tardes,';
+    return 'Buenas noches,';
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name')
+      .eq('id', user.id)
+      .single();
+
+    if (profile) setFirstName(profile.first_name || '');
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+    const { data: monthTx } = await supabase
+      .from('transactions')
+      .select('base_amount, type')
+      .gte('date', startOfMonth)
+      .lte('date', endOfMonth);
+
+    if (monthTx) {
+      const income = monthTx
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + Number(t.base_amount), 0);
+      const expenses = monthTx
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + Number(t.base_amount), 0);
+      setMonthIncome(income);
+      setMonthExpenses(expenses);
+    }
+
+    const { data: recentTx } = await supabase
+      .from('transactions')
+      .select('id, amount, type, description, date, is_recurring, currency, categories(name, icon, color)')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (recentTx) setTransactions(recentTx as any);
+
+    setLoading(false);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [])
+  );
+
+  const formatMoney = (value: number) => {
+    return value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString + 'T00:00:00');
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) return 'Hoy';
+    if (date.toDateString() === yesterday.toDateString()) return 'Ayer';
+
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const balance = monthIncome - monthExpenses;
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
@@ -31,8 +126,8 @@ export default function DashboardScreen() {
         {/* HEADER */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Buenos días,</Text>
-            <Text style={styles.name}>Alejandra 👋</Text>
+            <Text style={styles.greeting}>{getGreeting()}</Text>
+            <Text style={styles.name}>{firstName} 👋</Text>
           </View>
           <TouchableOpacity style={styles.bellBtn}>
             <Bell size={20} color={Colors.textPrimary} />
@@ -41,91 +136,23 @@ export default function DashboardScreen() {
 
         {/* TARJETA SALDO */}
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>SALDO DISPONIBLE REAL</Text>
-          <Text style={styles.balanceAmount}>1.240,50 €</Text>
-          <Text style={styles.balanceUpdated}>Actualizado hace un momento</Text>
+          <Text style={styles.balanceLabel}>SALDO DEL MES</Text>
+          <Text style={[styles.balanceAmount, { color: balance >= 0 ? '#fff' : Colors.negative }]}>
+            {balance >= 0 ? '' : '-'}{formatMoney(Math.abs(balance))} €
+          </Text>
+          <Text style={styles.balanceUpdated}>
+            {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+          </Text>
           <View style={styles.balanceRow}>
             <View style={styles.balanceMini}>
               <Text style={styles.balanceMiniLabel}>Ingresos</Text>
-              <Text style={styles.balanceMiniPos}>+1850,00€</Text>
+              <Text style={styles.balanceMiniPos}>+{formatMoney(monthIncome)}€</Text>
               <Text style={styles.balanceMiniSub}>Este mes</Text>
             </View>
             <View style={styles.balanceMini}>
               <Text style={styles.balanceMiniLabel}>Gastos</Text>
-              <Text style={styles.balanceMiniNeg}>-610,00€</Text>
+              <Text style={styles.balanceMiniNeg}>-{formatMoney(monthExpenses)}€</Text>
               <Text style={styles.balanceMiniSub}>Este mes</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* BALANCES CON AMIGOS */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Balances con amigos</Text>
-            <TouchableOpacity>
-              <Text style={styles.sectionLink}>Ver todos {'>'}</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {friends.map((f) => (
-              <View key={f.name} style={styles.friendCard}>
-                <View style={[styles.avatar, { backgroundColor: f.color }]}>
-                  <Text style={styles.avatarText}>{f.initials}</Text>
-                  <View style={[styles.avatarDot, { backgroundColor: f.positive ? Colors.positive : Colors.negative }]} />
-                </View>
-                <Text style={styles.friendName}>{f.name}</Text>
-                <Text style={[styles.friendAmount, { color: f.positive ? Colors.positive : Colors.negative }]}>
-                  {f.amount}
-                </Text>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* LÍMITES DEL MES */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Límites del mes</Text>
-            <TouchableOpacity>
-              <Text style={styles.sectionLink}>Ver todos {'>'}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.card}>
-            {limits.map((item, index) => (
-              <View key={item.name} style={[styles.limitRow, index < limits.length - 1 && styles.limitBorder]}>
-                <View style={styles.limitTop}>
-                  <Text style={styles.limitName}>{item.name}</Text>
-                  <Text style={styles.limitAmount}>{item.spent},00€ / {item.limit},00€</Text>
-                </View>
-                <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: `${item.pct}%` as any, backgroundColor: item.color }]} />
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* METAS */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Tus metas</Text>
-            <TouchableOpacity>
-              <Text style={styles.sectionLink}>Ver todas {'>'}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.card}>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaName}>Viaje a Japón ✈️</Text>
-              <View style={styles.metaPctBadge}>
-                <Text style={styles.metaPctText}>62%</Text>
-              </View>
-            </View>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: '62%', backgroundColor: Colors.primary }]} />
-            </View>
-            <View style={styles.metaDetails}>
-              <Text style={styles.metaSub}>1.240,00€ ahorrados</Text>
-              <Text style={styles.metaSub}>Faltan 760,00€</Text>
             </View>
           </View>
         </View>
@@ -134,26 +161,57 @@ export default function DashboardScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Últimos movimientos</Text>
-            <TouchableOpacity>
-              <Text style={styles.sectionLink}>Ver todos {'>'}</Text>
-            </TouchableOpacity>
           </View>
-          <View style={styles.card}>
-            {transactions.map((tx, index) => (
-              <View key={tx.name} style={[styles.txRow, index < transactions.length - 1 && styles.txBorder]}>
-                <View style={styles.txIcon}>
-                  {tx.icon === 'cart'
-                    ? <ShoppingCart size={18} color="#9B59B6" />
-                    : <UtensilsCrossed size={18} color="#F39C12" />
-                  }
+          {transactions.length > 0 ? (
+            <View style={styles.card}>
+              {transactions.map((tx, index) => (
+                <View key={tx.id} style={[styles.txRow, index < transactions.length - 1 && styles.txBorder]}>
+                  <View style={[styles.txIcon, { backgroundColor: (tx.categories?.color || '#8E8E93') + '15' }]}>
+                    <Text style={{ fontSize: 18 }}>{tx.categories?.icon || '📦'}</Text>
+                  </View>
+                  <View style={styles.txInfo}>
+                    <Text style={styles.txName}>{tx.description || tx.categories?.name || 'Sin concepto'}</Text>
+                    <Text style={styles.txCategory}>
+                      {tx.categories?.name || 'Sin categoría'} · {formatDate(tx.date)}
+                      {tx.is_recurring ? ' · 🔄' : ''}
+                    </Text>
+                  </View>
+                  <Text style={[styles.txAmount, { color: tx.type === 'income' ? Colors.positive : Colors.textPrimary }]}>
+                    {tx.type === 'income' ? '+' : '-'}{formatMoney(tx.amount)} {tx.currency === 'EUR' ? '€' : tx.currency}
+                  </Text>
                 </View>
-                <View style={styles.txInfo}>
-                  <Text style={styles.txName}>{tx.name}</Text>
-                  <Text style={styles.txCategory}>{tx.category}</Text>
-                </View>
-                <Text style={styles.txAmount}>{tx.amount}</Text>
-              </View>
-            ))}
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyEmoji}>💸</Text>
+              <Text style={styles.emptyText}>Aún no tienes movimientos</Text>
+              <Text style={styles.emptySub}>Pulsa el botón + para añadir tu primer gasto o ingreso</Text>
+            </View>
+          )}
+        </View>
+
+        {/* LÍMITES DEL MES */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Límites del mes</Text>
+          </View>
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyEmoji}>📊</Text>
+            <Text style={styles.emptyText}>Sin límites configurados</Text>
+            <Text style={styles.emptySub}>Próximamente podrás establecer límites por categoría</Text>
+          </View>
+        </View>
+
+        {/* METAS */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Tus metas</Text>
+          </View>
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyEmoji}>🎯</Text>
+            <Text style={styles.emptyText}>Sin metas de ahorro</Text>
+            <Text style={styles.emptySub}>Próximamente podrás crear objetivos de ahorro</Text>
           </View>
         </View>
 
@@ -184,32 +242,25 @@ const styles = StyleSheet.create({
   section: { marginBottom: Spacing.lg },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
   sectionTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary },
-  sectionLink: { fontSize: FontSize.sm, color: Colors.primary },
   card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.md, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
-  friendCard: { alignItems: 'center', marginRight: Spacing.sm, backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.md, minWidth: 85, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
-  avatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.xs },
-  avatarText: { color: '#fff', fontWeight: '700', fontSize: FontSize.md },
-  avatarDot: { position: 'absolute', bottom: 0, right: 0, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#fff' },
-  friendName: { fontSize: FontSize.sm, color: Colors.textPrimary, marginBottom: 2, fontWeight: '500' },
-  friendAmount: { fontSize: FontSize.sm, fontWeight: '700' },
-  limitRow: { paddingVertical: Spacing.sm },
-  limitBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border, marginBottom: Spacing.xs },
-  limitTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.xs },
-  limitName: { fontSize: FontSize.md, color: Colors.textPrimary, fontWeight: '500' },
-  limitAmount: { fontSize: FontSize.sm, color: Colors.textSecondary },
-  progressBar: { height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden', marginTop: 4 },
-  progressFill: { height: '100%', borderRadius: 3 },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
-  metaName: { fontSize: FontSize.md, color: Colors.textPrimary, fontWeight: '500' },
-  metaPctBadge: { backgroundColor: Colors.primaryLight, borderRadius: BorderRadius.full, paddingHorizontal: 10, paddingVertical: 3 },
-  metaPctText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600' },
-  metaDetails: { flexDirection: 'row', justifyContent: 'space-between', marginTop: Spacing.sm },
-  metaSub: { fontSize: FontSize.xs, color: Colors.textSecondary },
   txRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
   txBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
-  txIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm },
+  txIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm },
   txInfo: { flex: 1 },
   txName: { fontSize: FontSize.md, color: Colors.textPrimary, fontWeight: '500' },
   txCategory: { fontSize: FontSize.xs, color: Colors.textSecondary },
-  txAmount: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
+  txAmount: { fontSize: FontSize.md, fontWeight: '700' },
+  emptyCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  emptyEmoji: { fontSize: 32, marginBottom: Spacing.sm },
+  emptyText: { fontSize: FontSize.md, fontWeight: '600', color: Colors.textPrimary, marginBottom: 4 },
+  emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center' },
 });

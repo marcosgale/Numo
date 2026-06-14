@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, Keyboard, TouchableWithoutFeedback, ScrollView, Modal, FlatList
+  Alert, Keyboard, TouchableWithoutFeedback, ScrollView, Modal, FlatList, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronDown } from 'lucide-react-native';
@@ -42,13 +42,15 @@ export default function AddTransactionScreen({ route, navigation }: any) {
   const [concept, setConcept] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [currency, setCurrency] = useState(CURRENCIES[0]);
+  const [baseCurrency, setBaseCurrency] = useState('EUR');
+  const [baseAmount, setBaseAmount] = useState<number | null>(null);
+  const [converting, setConverting] = useState(false);
   const [currencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
-      // Cargar categorías
       const { data: cats } = await supabase
         .from('categories')
         .select('*')
@@ -56,7 +58,6 @@ export default function AddTransactionScreen({ route, navigation }: any) {
         .order('name');
       if (cats) setCategories(cats);
 
-      // Cargar moneda del perfil del usuario
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
@@ -65,6 +66,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
           .eq('id', user.id)
           .single();
         if (profile?.currency) {
+          setBaseCurrency(profile.currency);
           const userCurrency = CURRENCIES.find(c => c.code === profile.currency);
           if (userCurrency) setCurrency(userCurrency);
         }
@@ -73,13 +75,46 @@ export default function AddTransactionScreen({ route, navigation }: any) {
     fetchData();
   }, [type]);
 
+  // Conversión automática cuando cambia importe o moneda
+  useEffect(() => {
+    const convert = async () => {
+      if (!amount || parseFloat(amount) <= 0) {
+        setBaseAmount(null);
+        return;
+      }
+
+      if (currency.code === baseCurrency) {
+        setBaseAmount(parseFloat(amount));
+        return;
+      }
+
+      setConverting(true);
+      try {
+        const response = await fetch(
+          `https://api.frankfurter.app/latest?from=${currency.code}&to=${baseCurrency}&amount=${parseFloat(amount)}`
+        );
+        const data = await response.json();
+        if (data.rates && data.rates[baseCurrency]) {
+          setBaseAmount(Math.round(data.rates[baseCurrency] * 100) / 100);
+        }
+      } catch (error) {
+        console.log('Error de conversión:', error);
+        setBaseAmount(null);
+      }
+      setConverting(false);
+    };
+
+    const timeout = setTimeout(convert, 500);
+    return () => clearTimeout(timeout);
+  }, [amount, currency.code, baseCurrency]);
+
   const handleSave = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       Alert.alert('Error', 'Introduce un importe válido');
       return;
     }
-    if (!selectedCategory) {
-      Alert.alert('Error', 'Selecciona una categoría');
+    if (baseAmount === null) {
+      Alert.alert('Error', 'Esperando conversión de moneda...');
       return;
     }
 
@@ -103,6 +138,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
       date: today,
       is_recurring: isRecurring,
       currency: currency.code,
+      base_amount: baseAmount,
     });
 
     setLoading(false);
@@ -125,6 +161,8 @@ export default function AddTransactionScreen({ route, navigation }: any) {
     if (parts[1]?.length > 2) return amount;
     return cleaned;
   };
+
+  const baseCurrencySymbol = CURRENCIES.find(c => c.code === baseCurrency)?.symbol || '€';
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -165,6 +203,20 @@ export default function AddTransactionScreen({ route, navigation }: any) {
                 <ChevronDown size={16} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
+            {/* CONVERSIÓN */}
+            {currency.code !== baseCurrency && amount && parseFloat(amount) > 0 && (
+              <View style={styles.conversionRow}>
+                {converting ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : baseAmount !== null ? (
+                  <Text style={styles.conversionText}>
+                    ≈ {baseAmount.toFixed(2)} {baseCurrencySymbol} al cambio actual
+                  </Text>
+                ) : (
+                  <Text style={styles.conversionError}>No se pudo obtener el tipo de cambio</Text>
+                )}
+              </View>
+            )}
           </View>
 
           {/* CONCEPTO */}
@@ -181,8 +233,16 @@ export default function AddTransactionScreen({ route, navigation }: any) {
 
           {/* CATEGORÍAS */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Categoría</Text>
+            <Text style={styles.sectionLabel}>Categoría (opcional)</Text>
             <View style={styles.categoryGrid}>
+              {selectedCategory && (
+                <TouchableOpacity
+                  style={[styles.categoryChip, { backgroundColor: Colors.border + '40', borderColor: Colors.border }]}
+                  onPress={() => setSelectedCategory(null)}
+                >
+                  <Text style={styles.categoryName}>✕ Quitar</Text>
+                </TouchableOpacity>
+              )}
               {categories.map((cat) => (
                 <TouchableOpacity
                   key={cat.id}
@@ -208,7 +268,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleSave}
-            disabled={loading}
+            disabled={loading || converting}
           >
             <Text style={styles.buttonText}>
               {loading ? 'Guardando...' : 'Guardar'}
@@ -295,6 +355,9 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.sm,
   },
   currencySymbol: { fontSize: 32, fontWeight: '700', color: Colors.textSecondary, marginRight: 4 },
+  conversionRow: { marginTop: Spacing.xs },
+  conversionText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '500' },
+  conversionError: { fontSize: FontSize.sm, color: Colors.negative },
   section: { marginBottom: Spacing.lg },
   sectionLabel: { fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.sm },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
