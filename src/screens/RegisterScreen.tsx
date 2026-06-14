@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 
-export default function RegisterScreen() {
+export default function RegisterScreen({ navigation }: any) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -13,7 +13,6 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
 
   const validateAge = (dateString: string): boolean => {
-    // Espera formato DD/MM/YYYY
     const parts = dateString.split('/');
     if (parts.length !== 3) return false;
     const birth = new Date(
@@ -31,7 +30,6 @@ export default function RegisterScreen() {
   };
 
   const formatBirthDate = (text: string): string => {
-    // Añade las barras automáticamente: 12/06/2000
     const cleaned = text.replace(/\D/g, '');
     if (cleaned.length <= 2) return cleaned;
     if (cleaned.length <= 4) return `${cleaned.slice(0, 2)}/${cleaned.slice(2)}`;
@@ -76,8 +74,6 @@ export default function RegisterScreen() {
 
     if (error) {
       Alert.alert('Error', error.message);
-    } else {
-      Alert.alert('¡Cuenta creada!', 'Ya puedes usar Numo');
     }
   };
 
@@ -145,6 +141,15 @@ export default function RegisterScreen() {
           >
             <Text style={styles.buttonText}>{loading ? 'Creando...' : 'Registrarme'}</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.linkText}>
+              ¿Ya tienes cuenta? <Text style={styles.linkBold}>Iniciar sesión</Text>
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
     </TouchableWithoutFeedback>
@@ -160,4 +165,7 @@ const styles = StyleSheet.create({
   button: { backgroundColor: Colors.primary, borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', marginTop: Spacing.sm },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: FontSize.md, fontWeight: '700' },
+  linkButton: { alignItems: 'center', marginTop: Spacing.lg, paddingBottom: Spacing.lg },
+  linkText: { fontSize: FontSize.md, color: Colors.textSecondary },
+  linkBold: { color: Colors.primary, fontWeight: '700' },
 });

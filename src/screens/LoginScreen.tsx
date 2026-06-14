@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,8 +16,6 @@ export default function LoginScreen() {
 
     if (error) {
       Alert.alert('Error', error.message);
-    } else {
-      Alert.alert('¡Bienvenido!', 'Sesión iniciada correctamente');
     }
   };
 
@@ -54,6 +52,15 @@ export default function LoginScreen() {
           >
             <Text style={styles.buttonText}>{loading ? 'Entrando...' : 'Entrar'}</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => navigation.navigate('Register')}
+          >
+            <Text style={styles.linkText}>
+              ¿No tienes cuenta? <Text style={styles.linkBold}>Crear cuenta</Text>
+            </Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </TouchableWithoutFeedback>
@@ -69,4 +76,7 @@ const styles = StyleSheet.create({
   button: { backgroundColor: Colors.primary, borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', marginTop: Spacing.sm },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: FontSize.md, fontWeight: '700' },
+  linkButton: { alignItems: 'center', marginTop: Spacing.lg },
+  linkText: { fontSize: FontSize.md, color: Colors.textSecondary },
+  linkBold: { color: Colors.primary, fontWeight: '700' },
 });

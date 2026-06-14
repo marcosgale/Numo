@@ -3,7 +3,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from './src/services/supabase';
 import Navigation from './src/navigation';
-import LoginScreen from './src/screens/LoginScreen';
+import AuthNavigator from './src/navigation/AuthNavigator';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -26,7 +26,7 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {session ? <Navigation /> : <LoginScreen />}
+      {session ? <Navigation /> : <AuthNavigator />}
     </GestureHandlerRootView>
   );
 }
