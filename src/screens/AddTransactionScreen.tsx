@@ -35,6 +35,12 @@ const CURRENCIES = [
   { code: 'THB', symbol: '฿', name: 'Baht tailandés' },
 ];
 
+const PERIODS = [
+  { value: 'weekly', label: 'Semanal', description: 'Cada semana' },
+  { value: 'monthly', label: 'Mensual', description: 'Cada mes' },
+  { value: 'yearly', label: 'Anual', description: 'Cada año' },
+];
+
 export default function AddTransactionScreen({ route, navigation }: any) {
   const { type, isRecurring } = route.params;
 
@@ -45,6 +51,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
   const [baseCurrency, setBaseCurrency] = useState('EUR');
   const [baseAmount, setBaseAmount] = useState<number | null>(null);
   const [converting, setConverting] = useState(false);
+  const [recurrencePeriod, setRecurrencePeriod] = useState('monthly');
   const [currencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
@@ -75,7 +82,6 @@ export default function AddTransactionScreen({ route, navigation }: any) {
     fetchData();
   }, [type]);
 
-  // Conversión automática cuando cambia importe o moneda
   useEffect(() => {
     const convert = async () => {
       if (!amount || parseFloat(amount) <= 0) {
@@ -139,6 +145,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
       is_recurring: isRecurring,
       currency: currency.code,
       base_amount: baseAmount,
+      recurrence_period: isRecurring ? recurrencePeriod : null,
     });
 
     setLoading(false);
@@ -203,7 +210,6 @@ export default function AddTransactionScreen({ route, navigation }: any) {
                 <ChevronDown size={16} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            {/* CONVERSIÓN */}
             {currency.code !== baseCurrency && amount && parseFloat(amount) > 0 && (
               <View style={styles.conversionRow}>
                 {converting ? (
@@ -230,6 +236,38 @@ export default function AddTransactionScreen({ route, navigation }: any) {
               onChangeText={setConcept}
             />
           </View>
+
+          {/* FRECUENCIA (solo si es recurrente) */}
+          {isRecurring && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Frecuencia</Text>
+              <View style={styles.periodRow}>
+                {PERIODS.map((period) => (
+                  <TouchableOpacity
+                    key={period.value}
+                    style={[
+                      styles.periodChip,
+                      recurrencePeriod === period.value && styles.periodChipActive,
+                    ]}
+                    onPress={() => setRecurrencePeriod(period.value)}
+                  >
+                    <Text style={[
+                      styles.periodLabel,
+                      recurrencePeriod === period.value && styles.periodLabelActive,
+                    ]}>
+                      {period.label}
+                    </Text>
+                    <Text style={[
+                      styles.periodDesc,
+                      recurrencePeriod === period.value && styles.periodDescActive,
+                    ]}>
+                      {period.description}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* CATEGORÍAS */}
           <View style={styles.section}>
@@ -360,6 +398,32 @@ const styles = StyleSheet.create({
   conversionError: { fontSize: FontSize.sm, color: Colors.negative },
   section: { marginBottom: Spacing.lg },
   sectionLabel: { fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.sm },
+  periodRow: { flexDirection: 'row', gap: Spacing.sm },
+  periodChip: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  periodChipActive: {
+    backgroundColor: Colors.primary + '15',
+    borderColor: Colors.primary,
+  },
+  periodLabel: {
+    fontSize: FontSize.md,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  periodLabelActive: { color: Colors.primary },
+  periodDesc: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+  },
+  periodDescActive: { color: Colors.primary },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
   categoryChip: {
     flexDirection: 'row',

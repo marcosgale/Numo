@@ -9,10 +9,12 @@ import { useFocusEffect } from '@react-navigation/native';
 type Transaction = {
   id: string;
   amount: number;
+  base_amount: number;
   type: string;
   description: string | null;
   date: string;
   is_recurring: boolean;
+  recurrence_period: string | null;
   currency: string;
   categories: {
     name: string;
@@ -24,6 +26,7 @@ type Transaction = {
 export default function DashboardScreen() {
   const [firstName, setFirstName] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [recurringTx, setRecurringTx] = useState<Transaction[]>([]);
   const [monthIncome, setMonthIncome] = useState(0);
   const [monthExpenses, setMonthExpenses] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -70,14 +73,25 @@ export default function DashboardScreen() {
       setMonthExpenses(expenses);
     }
 
+    // Últimas 10 transacciones NO recurrentes
     const { data: recentTx } = await supabase
       .from('transactions')
-      .select('id, amount, type, description, date, is_recurring, currency, categories(name, icon, color)')
+      .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, categories(name, icon, color)')
+      .eq('is_recurring', false)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(10);
 
     if (recentTx) setTransactions(recentTx as any);
+
+    // Todas las transacciones recurrentes (sin límite)
+    const { data: recurring } = await supabase
+      .from('transactions')
+      .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, categories(name, icon, color)')
+      .eq('is_recurring', true)
+      .order('created_at', { ascending: false });
+
+    if (recurring) setRecurringTx(recurring as any);
 
     setLoading(false);
   };
@@ -103,6 +117,43 @@ export default function DashboardScreen() {
 
     return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
   };
+
+  const getPeriodLabel = (period: string | null) => {
+    switch (period) {
+      case 'weekly': return '/ semana';
+      case 'monthly': return '/ mes';
+      case 'yearly': return '/ año';
+      default: return '/ mes';
+    }
+  };
+
+  const getNextDate = (dateString: string, period: string | null) => {
+    const date = new Date(dateString + 'T00:00:00');
+    const now = new Date();
+
+    switch (period) {
+      case 'weekly':
+        while (date <= now) date.setDate(date.getDate() + 7);
+        break;
+      case 'yearly':
+        while (date <= now) date.setFullYear(date.getFullYear() + 1);
+        break;
+      default: // monthly
+        while (date <= now) date.setMonth(date.getMonth() + 1);
+        break;
+    }
+
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  };
+
+  const monthlyRecurringTotal = recurringTx.reduce((sum, tx) => {
+    const amount = Number(tx.base_amount);
+    switch (tx.recurrence_period) {
+      case 'weekly': return sum + (amount * 4.33);
+      case 'yearly': return sum + (amount / 12);
+      default: return sum + amount;
+    }
+  }, 0);
 
   if (loading) {
     return (
@@ -157,6 +208,40 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+        {/* GASTOS RECURRENTES */}
+        {recurringTx.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Gastos recurrentes</Text>
+            </View>
+            <View style={styles.recurringTotal}>
+              <Text style={styles.recurringTotalLabel}>Total mensual estimado</Text>
+              <Text style={styles.recurringTotalAmount}>-{formatMoney(monthlyRecurringTotal)}€</Text>
+            </View>
+            <View style={styles.card}>
+              {recurringTx.map((tx, index) => (
+                <View key={tx.id} style={[styles.recurringRow, index < recurringTx.length - 1 && styles.txBorder]}>
+                  <View style={[styles.txIcon, { backgroundColor: (tx.categories?.color || '#8E8E93') + '15' }]}>
+                    <Text style={{ fontSize: 18 }}>{tx.categories?.icon || '🔄'}</Text>
+                  </View>
+                  <View style={styles.txInfo}>
+                    <Text style={styles.txName}>{tx.description || tx.categories?.name || 'Sin concepto'}</Text>
+                    <Text style={styles.txCategory}>
+                      Próximo: {getNextDate(tx.date, tx.recurrence_period)}
+                    </Text>
+                  </View>
+                  <View style={styles.recurringRight}>
+                    <Text style={styles.recurringAmount}>
+                      -{formatMoney(tx.amount)} {tx.currency === 'EUR' ? '€' : tx.currency}
+                    </Text>
+                    <Text style={styles.recurringPeriod}>{getPeriodLabel(tx.recurrence_period)}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* ÚLTIMOS MOVIMIENTOS */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -173,7 +258,6 @@ export default function DashboardScreen() {
                     <Text style={styles.txName}>{tx.description || tx.categories?.name || 'Sin concepto'}</Text>
                     <Text style={styles.txCategory}>
                       {tx.categories?.name || 'Sin categoría'} · {formatDate(tx.date)}
-                      {tx.is_recurring ? ' · 🔄' : ''}
                     </Text>
                   </View>
                   <Text style={[styles.txAmount, { color: tx.type === 'income' ? Colors.positive : Colors.textPrimary }]}>
@@ -242,7 +326,23 @@ const styles = StyleSheet.create({
   section: { marginBottom: Spacing.lg },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
   sectionTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary },
+  recurringTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.negative + '10',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  recurringTotalLabel: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  recurringTotalAmount: { fontSize: FontSize.md, fontWeight: '700', color: Colors.negative },
   card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.md, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
+  recurringRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
+  recurringRight: { alignItems: 'flex-end' },
+  recurringAmount: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
+  recurringPeriod: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
   txRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
   txBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
   txIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm },
