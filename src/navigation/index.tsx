@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Home, Users, Target, User, Plus } from 'lucide-react-native';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Colors } from '../constants/theme';
 import DashboardScreen from '../screens/DashboardScreen';
+import AddTransactionScreen from '../screens/AddTransactionScreen';
 import AddButton from '../components/AddButton';
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
 
 function PlaceholderScreen({ name }: { name: string }) {
   return (
@@ -18,11 +21,10 @@ function PlaceholderScreen({ name }: { name: string }) {
 }
 
 function EmptyScreen() {
-  // Pantalla vacía: nunca se ve, solo existe para que la tab del botón "+" exista
   return <View />;
 }
 
-export default function Navigation() {
+function MainTabs({ navigation }: any) {
   const [modalVisible, setModalVisible] = useState(false);
 
   const handleAddOption = (option: 'expense' | 'income' | 'shared' | 'recurring') => {
@@ -30,11 +32,15 @@ export default function Navigation() {
       Alert.alert('Próximamente', 'Los gastos compartidos estarán disponibles pronto');
       return;
     }
-    Alert.alert('Seleccionado', `Has elegido: ${option}`);
+
+    navigation.navigate('AddTransaction', {
+      type: option === 'income' ? 'income' : 'expense',
+      isRecurring: option === 'recurring',
+    });
   };
 
   return (
-    <NavigationContainer>
+    <>
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
@@ -67,17 +73,17 @@ export default function Navigation() {
           component={EmptyScreen}
           options={{
             tabBarLabel: () => null,
-            tabBarIcon: () => (
-              <View style={styles.fab}>
-                <Plus size={28} color="#fff" />
-              </View>
-            ),
-            tabBarButton: (props) => (
+            tabBarIcon: () => null,
+            tabBarButton: () => (
               <TouchableOpacity
-                {...props}
                 onPress={() => setModalVisible(true)}
                 activeOpacity={0.8}
-              />
+                style={{ top: -10, justifyContent: 'center', alignItems: 'center' }}
+              >
+                <View style={styles.fab}>
+                  <Plus size={28} color="#fff" />
+                </View>
+              </TouchableOpacity>
             ),
           }}
         />
@@ -102,6 +108,21 @@ export default function Navigation() {
         onClose={() => setModalVisible(false)}
         onSelectOption={handleAddOption}
       />
+    </>
+  );
+}
+
+export default function Navigation() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="MainTabs" component={MainTabs} />
+        <Stack.Screen
+          name="AddTransaction"
+          component={AddTransactionScreen}
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+      </Stack.Navigator>
     </NavigationContainer>
   );
 }
@@ -114,7 +135,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 8,
