@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 type Transaction = {
   id: string;
@@ -16,6 +16,7 @@ type Transaction = {
   is_recurring: boolean;
   recurrence_period: string | null;
   currency: string;
+  category_id: string | null;
   categories: {
     name: string;
     icon: string;
@@ -24,6 +25,7 @@ type Transaction = {
 };
 
 export default function DashboardScreen() {
+  const navigation = useNavigation<any>();
   const [firstName, setFirstName] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [recurringTx, setRecurringTx] = useState<Transaction[]>([]);
@@ -73,10 +75,9 @@ export default function DashboardScreen() {
       setMonthExpenses(expenses);
     }
 
-    // Últimas 10 transacciones NO recurrentes
     const { data: recentTx } = await supabase
       .from('transactions')
-      .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, categories(name, icon, color)')
+      .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, category_id, categories(name, icon, color)')
       .eq('is_recurring', false)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
@@ -84,10 +85,9 @@ export default function DashboardScreen() {
 
     if (recentTx) setTransactions(recentTx as any);
 
-    // Todas las transacciones recurrentes (sin límite)
     const { data: recurring } = await supabase
       .from('transactions')
-      .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, categories(name, icon, color)')
+      .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, category_id, categories(name, icon, color)')
       .eq('is_recurring', true)
       .order('created_at', { ascending: false });
 
@@ -101,6 +101,22 @@ export default function DashboardScreen() {
       fetchData();
     }, [])
   );
+
+  const handleEditTransaction = (tx: Transaction) => {
+    navigation.navigate('AddTransaction', {
+      type: tx.type,
+      isRecurring: tx.is_recurring,
+      transaction: {
+        id: tx.id,
+        amount: tx.amount,
+        description: tx.description,
+        category_id: tx.category_id,
+        currency: tx.currency,
+        recurrence_period: tx.recurrence_period,
+        date: tx.date,
+      },
+    });
+  };
 
   const formatMoney = (value: number) => {
     return value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -138,7 +154,7 @@ export default function DashboardScreen() {
       case 'yearly':
         while (date <= now) date.setFullYear(date.getFullYear() + 1);
         break;
-      default: // monthly
+      default:
         while (date <= now) date.setMonth(date.getMonth() + 1);
         break;
     }
@@ -220,7 +236,12 @@ export default function DashboardScreen() {
             </View>
             <View style={styles.card}>
               {recurringTx.map((tx, index) => (
-                <View key={tx.id} style={[styles.recurringRow, index < recurringTx.length - 1 && styles.txBorder]}>
+                <TouchableOpacity
+                  key={tx.id}
+                  style={[styles.recurringRow, index < recurringTx.length - 1 && styles.txBorder]}
+                  onPress={() => handleEditTransaction(tx)}
+                  activeOpacity={0.6}
+                >
                   <View style={[styles.txIcon, { backgroundColor: (tx.categories?.color || '#8E8E93') + '15' }]}>
                     <Text style={{ fontSize: 18 }}>{tx.categories?.icon || '🔄'}</Text>
                   </View>
@@ -236,7 +257,7 @@ export default function DashboardScreen() {
                     </Text>
                     <Text style={styles.recurringPeriod}>{getPeriodLabel(tx.recurrence_period)}</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           </View>
@@ -250,7 +271,12 @@ export default function DashboardScreen() {
           {transactions.length > 0 ? (
             <View style={styles.card}>
               {transactions.map((tx, index) => (
-                <View key={tx.id} style={[styles.txRow, index < transactions.length - 1 && styles.txBorder]}>
+                <TouchableOpacity
+                  key={tx.id}
+                  style={[styles.txRow, index < transactions.length - 1 && styles.txBorder]}
+                  onPress={() => handleEditTransaction(tx)}
+                  activeOpacity={0.6}
+                >
                   <View style={[styles.txIcon, { backgroundColor: (tx.categories?.color || '#8E8E93') + '15' }]}>
                     <Text style={{ fontSize: 18 }}>{tx.categories?.icon || '📦'}</Text>
                   </View>
@@ -263,7 +289,7 @@ export default function DashboardScreen() {
                   <Text style={[styles.txAmount, { color: tx.type === 'income' ? Colors.positive : Colors.textPrimary }]}>
                     {tx.type === 'income' ? '+' : '-'}{formatMoney(tx.amount)} {tx.currency === 'EUR' ? '€' : tx.currency}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           ) : (

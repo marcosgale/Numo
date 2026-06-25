@@ -4,7 +4,7 @@ import {
   Alert, Keyboard, TouchableWithoutFeedback, ScrollView, Modal, FlatList, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronDown } from 'lucide-react-native';
+import { ChevronLeft, ChevronDown, Trash2 } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 
@@ -42,16 +42,21 @@ const PERIODS = [
 ];
 
 export default function AddTransactionScreen({ route, navigation }: any) {
-  const { type, isRecurring } = route.params;
+  const { type, isRecurring, transaction } = route.params;
+  const isEditing = !!transaction;
 
-  const [amount, setAmount] = useState('');
-  const [concept, setConcept] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [currency, setCurrency] = useState(CURRENCIES[0]);
+  const [amount, setAmount] = useState(isEditing ? String(transaction.amount) : '');
+  const [concept, setConcept] = useState(isEditing ? (transaction.description || '') : '');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(isEditing ? transaction.category_id : null);
+  const [currency, setCurrency] = useState(
+    isEditing ? (CURRENCIES.find(c => c.code === transaction.currency) || CURRENCIES[0]) : CURRENCIES[0]
+  );
   const [baseCurrency, setBaseCurrency] = useState('EUR');
   const [baseAmount, setBaseAmount] = useState<number | null>(null);
   const [converting, setConverting] = useState(false);
-  const [recurrencePeriod, setRecurrencePeriod] = useState('monthly');
+  const [recurrencePeriod, setRecurrencePeriod] = useState(
+    isEditing ? (transaction.recurrence_period || 'monthly') : 'monthly'
+  );
   const [currencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
@@ -74,8 +79,10 @@ export default function AddTransactionScreen({ route, navigation }: any) {
           .single();
         if (profile?.currency) {
           setBaseCurrency(profile.currency);
-          const userCurrency = CURRENCIES.find(c => c.code === profile.currency);
-          if (userCurrency) setCurrency(userCurrency);
+          if (!isEditing) {
+            const userCurrency = CURRENCIES.find(c => c.code === profile.currency);
+            if (userCurrency) setCurrency(userCurrency);
+          }
         }
       }
     };
@@ -133,20 +140,32 @@ export default function AddTransactionScreen({ route, navigation }: any) {
       return;
     }
 
-    const today = new Date().toISOString().split('T')[0];
-
-    const { error } = await supabase.from('transactions').insert({
-      user_id: user.id,
+    const transactionData = {
       category_id: selectedCategory,
       amount: parseFloat(amount),
       type: type,
       description: concept.trim() || null,
-      date: today,
       is_recurring: isRecurring,
       currency: currency.code,
       base_amount: baseAmount,
       recurrence_period: isRecurring ? recurrencePeriod : null,
-    });
+    };
+
+    let error;
+
+    if (isEditing) {
+      ({ error } = await supabase
+        .from('transactions')
+        .update(transactionData)
+        .eq('id', transaction.id));
+    } else {
+      const today = new Date().toISOString().split('T')[0];
+      ({ error } = await supabase.from('transactions').insert({
+        ...transactionData,
+        user_id: user.id,
+        date: today,
+      }));
+    }
 
     setLoading(false);
 
@@ -154,11 +173,41 @@ export default function AddTransactionScreen({ route, navigation }: any) {
       Alert.alert('Error', error.message);
     } else {
       Alert.alert(
-        isRecurring ? '¡Gasto recurrente registrado!' : type === 'expense' ? '¡Gasto registrado!' : '¡Ingreso registrado!',
+        isEditing ? '¡Actualizado!' : isRecurring ? '¡Gasto recurrente registrado!' : type === 'expense' ? '¡Gasto registrado!' : '¡Ingreso registrado!',
         '',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     }
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Eliminar movimiento',
+      '¿Estás seguro? Esta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            const { error } = await supabase
+              .from('transactions')
+              .delete()
+              .eq('id', transaction.id);
+            setLoading(false);
+
+            if (error) {
+              Alert.alert('Error', error.message);
+            } else {
+              Alert.alert('Eliminado', 'El movimiento ha sido eliminado', [
+                { text: 'OK', onPress: () => navigation.goBack() },
+              ]);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const formatAmount = (text: string) => {
@@ -171,6 +220,11 @@ export default function AddTransactionScreen({ route, navigation }: any) {
 
   const baseCurrencySymbol = CURRENCIES.find(c => c.code === baseCurrency)?.symbol || '€';
 
+  const getHeaderTitle = () => {
+    if (isEditing) return isRecurring ? 'Editar recurrente' : type === 'expense' ? 'Editar gasto' : 'Editar ingreso';
+    return isRecurring ? 'Nuevo gasto recurrente' : type === 'expense' ? 'Nuevo gasto' : 'Nuevo ingreso';
+  };
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView style={styles.safe}>
@@ -179,10 +233,14 @@ export default function AddTransactionScreen({ route, navigation }: any) {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <ChevronLeft size={28} color={Colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {isRecurring ? 'Nuevo gasto recurrente' : type === 'expense' ? 'Nuevo gasto' : 'Nuevo ingreso'}
-          </Text>
-          <View style={{ width: 28 }} />
+          <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
+          {isEditing ? (
+            <TouchableOpacity onPress={handleDelete}>
+              <Trash2 size={22} color={Colors.negative} />
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 28 }} />
+          )}
         </View>
 
         <ScrollView
@@ -200,7 +258,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
                 value={amount}
                 onChangeText={(text) => setAmount(formatAmount(text))}
                 keyboardType="decimal-pad"
-                autoFocus
+                autoFocus={!isEditing}
               />
               <TouchableOpacity
                 style={styles.currencyButton}
@@ -309,9 +367,17 @@ export default function AddTransactionScreen({ route, navigation }: any) {
             disabled={loading || converting}
           >
             <Text style={styles.buttonText}>
-              {loading ? 'Guardando...' : 'Guardar'}
+              {loading ? 'Guardando...' : isEditing ? 'Actualizar' : 'Guardar'}
             </Text>
           </TouchableOpacity>
+
+          {/* BOTÓN ELIMINAR (solo en edición) */}
+          {isEditing && (
+            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+              <Trash2 size={18} color={Colors.negative} />
+              <Text style={styles.deleteText}>Eliminar movimiento</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
 
         {/* MODAL SELECTOR DE MONEDA */}
@@ -453,6 +519,16 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: FontSize.md, fontWeight: '700' },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.negative + '10',
+  },
+  deleteText: { fontSize: FontSize.md, fontWeight: '600', color: Colors.negative, marginLeft: Spacing.xs },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
