@@ -8,6 +8,9 @@ import { Colors } from '../constants/theme';
 import DashboardScreen from '../screens/DashboardScreen';
 import AddTransactionScreen from '../screens/AddTransactionScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import GoalsScreen from '../screens/GoalsScreen';
+import AddGoalScreen from '../screens/AddGoalScreen';
+import GoalDetailScreen from '../screens/GoalDetailScreen';
 import AddButton from '../components/AddButton';
 
 const Tab = createBottomTabNavigator();
@@ -90,7 +93,7 @@ function MainTabs({ navigation }: any) {
         />
         <Tab.Screen
           name="Metas"
-          children={() => <PlaceholderScreen name="Metas" />}
+          component={GoalsScreen}
           options={{
             tabBarIcon: ({ color }) => <Target size={22} color={color} />,
           }}
@@ -122,6 +125,16 @@ export default function Navigation() {
           name="AddTransaction"
           component={AddTransactionScreen}
           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="AddGoal"
+          component={AddGoalScreen}
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="GoalDetail"
+          component={GoalDetailScreen}
+          options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

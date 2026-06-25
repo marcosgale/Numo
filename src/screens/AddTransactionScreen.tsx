@@ -16,6 +16,14 @@ type Category = {
   type: string;
 };
 
+type Goal = {
+  id: string;
+  name: string;
+  emoji: string | null;
+  target_amount: number;
+  current_amount: number;
+};
+
 const CURRENCIES = [
   { code: 'EUR', symbol: '€', name: 'Euro' },
   { code: 'USD', symbol: '$', name: 'Dólar americano' },
@@ -59,6 +67,8 @@ export default function AddTransactionScreen({ route, navigation }: any) {
   );
   const [currencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [goalAllocations, setGoalAllocations] = useState<{ [goalId: string]: string }>({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -82,6 +92,22 @@ export default function AddTransactionScreen({ route, navigation }: any) {
           if (!isEditing) {
             const userCurrency = CURRENCIES.find(c => c.code === profile.currency);
             if (userCurrency) setCurrency(userCurrency);
+          }
+        }
+
+        // Cargar metas activas si es ingreso y no es edición
+        if (type === 'income' && !isEditing) {
+          const { data: goalsData } = await supabase
+            .from('goals')
+            .select('id, name, emoji, target_amount, current_amount')
+            .order('created_at', { ascending: false });
+
+          if (goalsData) {
+            // Solo metas no completadas
+            const active = goalsData.filter(
+              g => Number(g.current_amount) < Number(g.target_amount)
+            );
+            setGoals(active);
           }
         }
       }
@@ -121,6 +147,9 @@ export default function AddTransactionScreen({ route, navigation }: any) {
     return () => clearTimeout(timeout);
   }, [amount, currency.code, baseCurrency]);
 
+  const totalAllocated = Object.values(goalAllocations)
+    .reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+
   const handleSave = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       Alert.alert('Error', 'Introduce un importe válido');
@@ -128,6 +157,12 @@ export default function AddTransactionScreen({ route, navigation }: any) {
     }
     if (baseAmount === null) {
       Alert.alert('Error', 'Esperando conversión de moneda...');
+      return;
+    }
+
+    // Validar que las asignaciones no superen el importe
+    if (type === 'income' && totalAllocated > parseFloat(amount)) {
+      Alert.alert('Error', 'Has asignado más dinero a metas del que estás ingresando');
       return;
     }
 
@@ -167,17 +202,66 @@ export default function AddTransactionScreen({ route, navigation }: any) {
       }));
     }
 
+    if (error) {
+      setLoading(false);
+      Alert.alert('Error', error.message);
+      return;
+    }
+
+    // Si es ingreso y hay asignaciones a metas, crear transacciones de ahorro
+    if (type === 'income' && !isEditing && totalAllocated > 0) {
+      // Buscar categoría "Ahorro"
+      const { data: ahorroCategory } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('name', 'Ahorro')
+        .eq('type', 'expense')
+        .single();
+
+      const today = new Date().toISOString().split('T')[0];
+
+      for (const [goalId, allocationStr] of Object.entries(goalAllocations)) {
+        const allocation = parseFloat(allocationStr);
+        if (!allocation || allocation <= 0) continue;
+
+        const goalData = goals.find(g => g.id === goalId);
+        if (!goalData) continue;
+
+        // Crear transacción de ahorro
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          category_id: ahorroCategory?.id || null,
+          amount: allocation,
+          base_amount: allocation,
+          type: 'expense',
+          description: `Ahorro → ${goalData.name}`,
+          date: today,
+          is_recurring: false,
+          currency: baseCurrency,
+          goal_id: goalId,
+        });
+
+        // Actualizar current_amount de la meta
+        const newAmount = Number(goalData.current_amount) + allocation;
+        await supabase
+          .from('goals')
+          .update({ current_amount: newAmount })
+          .eq('id', goalId);
+      }
+    }
+
     setLoading(false);
 
-    if (error) {
-      Alert.alert('Error', error.message);
-    } else {
-      Alert.alert(
-        isEditing ? '¡Actualizado!' : isRecurring ? '¡Gasto recurrente registrado!' : type === 'expense' ? '¡Gasto registrado!' : '¡Ingreso registrado!',
-        '',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
-    }
+    const savedMsg = totalAllocated > 0
+      ? `${isRecurring ? 'Gasto recurrente registrado' : type === 'expense' ? 'Gasto registrado' : 'Ingreso registrado'}. Has apartado ${totalAllocated.toFixed(2)}€ para tus metas.`
+      : '';
+
+    Alert.alert(
+      isEditing ? '¡Actualizado!' : isRecurring ? '¡Gasto recurrente registrado!' : type === 'expense' ? '¡Gasto registrado!' : '¡Ingreso registrado!',
+      savedMsg,
+      [{ text: 'OK', onPress: () => navigation.goBack() }]
+    );
   };
 
   const handleDelete = () => {
@@ -218,11 +302,23 @@ export default function AddTransactionScreen({ route, navigation }: any) {
     return cleaned;
   };
 
+  const updateGoalAllocation = (goalId: string, value: string) => {
+    const cleaned = value.replace(/[^0-9.]/g, '');
+    setGoalAllocations(prev => ({
+      ...prev,
+      [goalId]: cleaned,
+    }));
+  };
+
   const baseCurrencySymbol = CURRENCIES.find(c => c.code === baseCurrency)?.symbol || '€';
 
   const getHeaderTitle = () => {
     if (isEditing) return isRecurring ? 'Editar recurrente' : type === 'expense' ? 'Editar gasto' : 'Editar ingreso';
     return isRecurring ? 'Nuevo gasto recurrente' : type === 'expense' ? 'Nuevo gasto' : 'Nuevo ingreso';
+  };
+
+  const formatMoney = (value: number) => {
+    return value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   return (
@@ -295,7 +391,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
             />
           </View>
 
-          {/* FRECUENCIA (solo si es recurrente) */}
+          {/* FRECUENCIA */}
           {isRecurring && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Frecuencia</Text>
@@ -360,6 +456,54 @@ export default function AddTransactionScreen({ route, navigation }: any) {
             </View>
           </View>
 
+          {/* APARTAR PARA METAS (solo ingresos, no edición) */}
+          {type === 'income' && !isEditing && goals.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>¿Apartar para tus metas?</Text>
+              <View style={styles.goalsCard}>
+                {goals.map((goal) => {
+                  const remaining = Number(goal.target_amount) - Number(goal.current_amount);
+                  const progress = Math.min((Number(goal.current_amount) / Number(goal.target_amount)) * 100, 100);
+                  return (
+                    <View key={goal.id} style={styles.goalAllocationRow}>
+                      <View style={styles.goalAllocationInfo}>
+                        <Text style={styles.goalAllocationEmoji}>{goal.emoji || '🎯'}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.goalAllocationName}>{goal.name}</Text>
+                          <Text style={styles.goalAllocationSub}>
+                            Faltan {formatMoney(remaining)}€ · {Math.round(progress)}%
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.goalAllocationInput}>
+                        <TextInput
+                          style={styles.goalInput}
+                          placeholder="0"
+                          placeholderTextColor={Colors.textSecondary}
+                          value={goalAllocations[goal.id] || ''}
+                          onChangeText={(text) => updateGoalAllocation(goal.id, text)}
+                          keyboardType="decimal-pad"
+                        />
+                        <Text style={styles.goalInputCurrency}>€</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+                {totalAllocated > 0 && (
+                  <View style={styles.allocationSummary}>
+                    <Text style={styles.allocationSummaryLabel}>Total apartado</Text>
+                    <Text style={styles.allocationSummaryAmount}>{formatMoney(totalAllocated)}€</Text>
+                    {amount && parseFloat(amount) > 0 && (
+                      <Text style={styles.allocationRemaining}>
+                        Te quedan {formatMoney(parseFloat(amount) - totalAllocated)}€ disponibles
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
           {/* BOTÓN GUARDAR */}
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
@@ -371,7 +515,6 @@ export default function AddTransactionScreen({ route, navigation }: any) {
             </Text>
           </TouchableOpacity>
 
-          {/* BOTÓN ELIMINAR (solo en edición) */}
           {isEditing && (
             <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
               <Trash2 size={18} color={Colors.negative} />
@@ -380,7 +523,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
           )}
         </ScrollView>
 
-        {/* MODAL SELECTOR DE MONEDA */}
+        {/* MODAL MONEDA */}
         <Modal
           visible={currencyModalVisible}
           transparent
@@ -485,10 +628,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   periodLabelActive: { color: Colors.primary },
-  periodDesc: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-  },
+  periodDesc: { fontSize: FontSize.xs, color: Colors.textSecondary },
   periodDescActive: { color: Colors.primary },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
   categoryChip: {
@@ -511,6 +651,51 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     color: Colors.textPrimary,
   },
+  goalsCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  goalAllocationRow: {
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  goalAllocationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  goalAllocationEmoji: { fontSize: 24, marginRight: Spacing.sm },
+  goalAllocationName: { fontSize: FontSize.md, fontWeight: '500', color: Colors.textPrimary },
+  goalAllocationSub: { fontSize: FontSize.xs, color: Colors.textSecondary },
+  goalAllocationInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.sm,
+    marginTop: 4,
+  },
+  goalInput: {
+    flex: 1,
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    padding: Spacing.sm,
+  },
+  goalInputCurrency: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textSecondary },
+  allocationSummary: {
+    paddingTop: Spacing.sm,
+    alignItems: 'center',
+  },
+  allocationSummaryLabel: { fontSize: FontSize.xs, color: Colors.textSecondary },
+  allocationSummaryAmount: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.primary },
+  allocationRemaining: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
   button: {
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.md,

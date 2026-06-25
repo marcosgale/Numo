@@ -17,6 +17,7 @@ type Transaction = {
   recurrence_period: string | null;
   currency: string;
   category_id: string | null;
+  goal_id: string | null;
   categories: {
     name: string;
     icon: string;
@@ -24,13 +25,24 @@ type Transaction = {
   } | null;
 };
 
+type Goal = {
+  id: string;
+  name: string;
+  target_amount: number;
+  current_amount: number;
+  emoji: string | null;
+};
+
 export default function DashboardScreen() {
   const navigation = useNavigation<any>();
   const [firstName, setFirstName] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [recurringTx, setRecurringTx] = useState<Transaction[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [monthIncome, setMonthIncome] = useState(0);
   const [monthExpenses, setMonthExpenses] = useState(0);
+  const [monthSavings, setMonthSavings] = useState(0);
+  const [totalInGoals, setTotalInGoals] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const getGreeting = () => {
@@ -58,9 +70,10 @@ export default function DashboardScreen() {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
+    // Transacciones del mes con goal_id para separar gastos de ahorros
     const { data: monthTx } = await supabase
       .from('transactions')
-      .select('base_amount, type')
+      .select('base_amount, type, goal_id')
       .gte('date', startOfMonth)
       .lte('date', endOfMonth);
 
@@ -68,30 +81,49 @@ export default function DashboardScreen() {
       const income = monthTx
         .filter(t => t.type === 'income')
         .reduce((sum, t) => sum + Number(t.base_amount), 0);
+      const savings = monthTx
+        .filter(t => t.type === 'expense' && t.goal_id !== null)
+        .reduce((sum, t) => sum + Number(t.base_amount), 0);
       const expenses = monthTx
-        .filter(t => t.type === 'expense')
+        .filter(t => t.type === 'expense' && t.goal_id === null)
         .reduce((sum, t) => sum + Number(t.base_amount), 0);
       setMonthIncome(income);
       setMonthExpenses(expenses);
+      setMonthSavings(savings);
     }
 
+    // Últimas 10 NO recurrentes y NO ahorros para metas
     const { data: recentTx } = await supabase
       .from('transactions')
-      .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, category_id, categories(name, icon, color)')
+      .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, category_id, goal_id, categories(name, icon, color)')
       .eq('is_recurring', false)
+      .is('goal_id', null)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(10);
 
     if (recentTx) setTransactions(recentTx as any);
 
+    // Recurrentes
     const { data: recurring } = await supabase
       .from('transactions')
-      .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, category_id, categories(name, icon, color)')
+      .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, category_id, goal_id, categories(name, icon, color)')
       .eq('is_recurring', true)
       .order('created_at', { ascending: false });
 
     if (recurring) setRecurringTx(recurring as any);
+
+    // Metas activas (top 3)
+    const { data: goalsData } = await supabase
+      .from('goals')
+      .select('id, name, target_amount, current_amount, emoji')
+      .order('created_at', { ascending: false })
+      .limit(3);
+
+    if (goalsData) {
+      setGoals(goalsData);
+      setTotalInGoals(goalsData.reduce((sum, g) => sum + Number(g.current_amount), 0));
+    }
 
     setLoading(false);
   };
@@ -146,7 +178,6 @@ export default function DashboardScreen() {
   const getNextDate = (dateString: string, period: string | null) => {
     const date = new Date(dateString + 'T00:00:00');
     const now = new Date();
-
     switch (period) {
       case 'weekly':
         while (date <= now) date.setDate(date.getDate() + 7);
@@ -158,7 +189,6 @@ export default function DashboardScreen() {
         while (date <= now) date.setMonth(date.getMonth() + 1);
         break;
     }
-
     return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
   };
 
@@ -171,6 +201,11 @@ export default function DashboardScreen() {
     }
   }, 0);
 
+  const getGoalProgress = (current: number, target: number) => {
+    if (target <= 0) return 0;
+    return Math.min((current / target) * 100, 100);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -181,7 +216,8 @@ export default function DashboardScreen() {
     );
   }
 
-  const balance = monthIncome - monthExpenses;
+  const available = monthIncome - monthExpenses - monthSavings;
+  const total = available + totalInGoals;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -201,11 +237,11 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* TARJETA SALDO */}
+        {/* TARJETA SALDO — DINERO DISPONIBLE */}
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>SALDO DEL MES</Text>
-          <Text style={[styles.balanceAmount, { color: balance >= 0 ? '#fff' : Colors.negative }]}>
-            {balance >= 0 ? '' : '-'}{formatMoney(Math.abs(balance))} €
+          <Text style={styles.balanceLabel}>DINERO DISPONIBLE</Text>
+          <Text style={[styles.balanceAmount, { color: available >= 0 ? '#fff' : Colors.negative }]}>
+            {available >= 0 ? '' : '-'}{formatMoney(Math.abs(available))} €
           </Text>
           <Text style={styles.balanceUpdated}>
             {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
@@ -214,15 +250,42 @@ export default function DashboardScreen() {
             <View style={styles.balanceMini}>
               <Text style={styles.balanceMiniLabel}>Ingresos</Text>
               <Text style={styles.balanceMiniPos}>+{formatMoney(monthIncome)}€</Text>
-              <Text style={styles.balanceMiniSub}>Este mes</Text>
             </View>
             <View style={styles.balanceMini}>
               <Text style={styles.balanceMiniLabel}>Gastos</Text>
               <Text style={styles.balanceMiniNeg}>-{formatMoney(monthExpenses)}€</Text>
-              <Text style={styles.balanceMiniSub}>Este mes</Text>
             </View>
           </View>
+          {monthSavings > 0 && (
+            <View style={[styles.balanceMini, { marginTop: Spacing.xs }]}>
+              <Text style={styles.balanceMiniLabel}>Ahorrado para metas</Text>
+              <Text style={[styles.balanceMiniPos, { color: '#FFD60A' }]}>-{formatMoney(monthSavings)}€</Text>
+            </View>
+          )}
         </View>
+
+        {/* TARJETA — TU DINERO TOTAL */}
+        {totalInGoals > 0 && (
+          <View style={styles.totalCard}>
+            <Text style={styles.totalTitle}>Tu dinero total</Text>
+            <View style={styles.totalRow}>
+              <View style={styles.totalItem}>
+                <Text style={styles.totalLabel}>Disponible</Text>
+                <Text style={styles.totalValue}>{formatMoney(Math.max(available, 0))}€</Text>
+              </View>
+              <Text style={styles.totalPlus}>+</Text>
+              <View style={styles.totalItem}>
+                <Text style={styles.totalLabel}>En metas</Text>
+                <Text style={[styles.totalValue, { color: Colors.primary }]}>{formatMoney(totalInGoals)}€</Text>
+              </View>
+              <Text style={styles.totalPlus}>=</Text>
+              <View style={styles.totalItem}>
+                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={[styles.totalValue, { color: Colors.positive }]}>{formatMoney(total)}€</Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* GASTOS RECURRENTES */}
         {recurringTx.length > 0 && (
@@ -259,6 +322,40 @@ export default function DashboardScreen() {
                   </View>
                 </TouchableOpacity>
               ))}
+            </View>
+          </View>
+        )}
+
+        {/* METAS */}
+        {goals.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Tus metas</Text>
+            </View>
+            <View style={styles.card}>
+              {goals.map((goal, index) => {
+                const progress = getGoalProgress(Number(goal.current_amount), Number(goal.target_amount));
+                return (
+                  <TouchableOpacity
+                    key={goal.id}
+                    style={[styles.goalRow, index < goals.length - 1 && styles.txBorder]}
+                    onPress={() => navigation.navigate('GoalDetail', { goalId: goal.id })}
+                    activeOpacity={0.6}
+                  >
+                    <Text style={styles.goalEmoji}>{goal.emoji || '🎯'}</Text>
+                    <View style={styles.goalInfo}>
+                      <Text style={styles.txName}>{goal.name}</Text>
+                      <View style={styles.goalProgressBar}>
+                        <View style={[styles.goalProgressFill, { width: `${progress}%` as any }]} />
+                      </View>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.goalPercent}>{Math.round(progress)}%</Text>
+                      <Text style={styles.goalAmounts}>{formatMoney(Number(goal.current_amount))}€</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         )}
@@ -301,30 +398,6 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        {/* LÍMITES DEL MES */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Límites del mes</Text>
-          </View>
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyEmoji}>📊</Text>
-            <Text style={styles.emptyText}>Sin límites configurados</Text>
-            <Text style={styles.emptySub}>Próximamente podrás establecer límites por categoría</Text>
-          </View>
-        </View>
-
-        {/* METAS */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Tus metas</Text>
-          </View>
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyEmoji}>🎯</Text>
-            <Text style={styles.emptyText}>Sin metas de ahorro</Text>
-            <Text style={styles.emptySub}>Próximamente podrás crear objetivos de ahorro</Text>
-          </View>
-        </View>
-
         <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
@@ -339,7 +412,7 @@ const styles = StyleSheet.create({
   greeting: { fontSize: FontSize.sm, color: Colors.textSecondary },
   name: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.textPrimary },
   bellBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  balanceCard: { backgroundColor: '#1C3A30', borderRadius: BorderRadius.lg, padding: Spacing.lg, marginBottom: Spacing.lg },
+  balanceCard: { backgroundColor: '#1C3A30', borderRadius: BorderRadius.lg, padding: Spacing.lg, marginBottom: Spacing.sm },
   balanceLabel: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', letterSpacing: 1, marginBottom: 4 },
   balanceAmount: { fontSize: 36, fontWeight: '700', color: '#fff', marginBottom: 4 },
   balanceUpdated: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.5)', marginBottom: Spacing.md },
@@ -348,7 +421,22 @@ const styles = StyleSheet.create({
   balanceMiniLabel: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginBottom: 2 },
   balanceMiniPos: { fontSize: FontSize.md, fontWeight: '700', color: Colors.positive },
   balanceMiniNeg: { fontSize: FontSize.md, fontWeight: '700', color: Colors.negative },
-  balanceMiniSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+  totalCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  totalTitle: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.textSecondary, marginBottom: Spacing.sm, textAlign: 'center' },
+  totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  totalItem: { alignItems: 'center', flex: 1 },
+  totalLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, marginBottom: 2 },
+  totalValue: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
+  totalPlus: { fontSize: FontSize.lg, color: Colors.textSecondary, marginHorizontal: 4 },
   section: { marginBottom: Spacing.lg },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
   sectionTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary },
@@ -369,6 +457,13 @@ const styles = StyleSheet.create({
   recurringRight: { alignItems: 'flex-end' },
   recurringAmount: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
   recurringPeriod: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
+  goalRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
+  goalEmoji: { fontSize: 28, marginRight: Spacing.sm },
+  goalInfo: { flex: 1, marginRight: Spacing.sm },
+  goalProgressBar: { height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden', marginTop: 4 },
+  goalProgressFill: { height: '100%', borderRadius: 3, backgroundColor: Colors.primary },
+  goalPercent: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary },
+  goalAmounts: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
   txRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
   txBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
   txIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm },
