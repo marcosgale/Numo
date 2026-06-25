@@ -7,6 +7,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Colors } from '../constants/theme';
 import DashboardScreen from '../screens/DashboardScreen';
 import AddTransactionScreen from '../screens/AddTransactionScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import AddButton from '../components/AddButton';
 
 const Tab = createBottomTabNavigator();
@@ -96,7 +97,7 @@ function MainTabs({ navigation }: any) {
         />
         <Tab.Screen
           name="Perfil"
-          children={() => <PlaceholderScreen name="Perfil" />}
+          component={ProfileScreen}
           options={{
             tabBarIcon: ({ color }) => <User size={22} color={color} />,
           }}
