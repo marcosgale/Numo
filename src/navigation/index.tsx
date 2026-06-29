@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Home, Users, Target, User, Plus } from 'lucide-react-native';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Colors } from '../constants/theme';
 import DashboardScreen from '../screens/DashboardScreen';
 import AddTransactionScreen from '../screens/AddTransactionScreen';
@@ -13,18 +13,14 @@ import AddGoalScreen from '../screens/AddGoalScreen';
 import GoalDetailScreen from '../screens/GoalDetailScreen';
 import LimitsScreen from '../screens/LimitsScreen';
 import AddLimitScreen from '../screens/AddLimitScreen';
+import GroupsScreen from '../screens/GroupsScreen';
+import CreateGroupScreen from '../screens/CreateGroupScreen';
+import GroupDetailScreen from '../screens/GroupDetailScreen';
+import AddGroupExpenseScreen from '../screens/AddGroupExpenseScreen';
 import AddButton from '../components/AddButton';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
-
-function PlaceholderScreen({ name }: { name: string }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <Text>{name}</Text>
-    </View>
-  );
-}
 
 function EmptyScreen() {
   return <View />;
@@ -69,7 +65,7 @@ function MainTabs({ navigation }: any) {
         />
         <Tab.Screen
           name="Grupos"
-          children={() => <PlaceholderScreen name="Grupos" />}
+          component={GroupsScreen}
           options={{
             tabBarIcon: ({ color }) => <Users size={22} color={color} />,
           }}
@@ -146,6 +142,21 @@ export default function Navigation() {
         <Stack.Screen
           name="AddLimit"
           component={AddLimitScreen}
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="CreateGroup"
+          component={CreateGroupScreen}
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="GroupDetail"
+          component={GroupDetailScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="AddGroupExpense"
+          component={AddGroupExpenseScreen}
           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
         />
       </Stack.Navigator>
