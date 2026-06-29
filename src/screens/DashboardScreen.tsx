@@ -33,12 +33,26 @@ type Goal = {
   emoji: string | null;
 };
 
+type LimitWithSpent = {
+  id: string;
+  amount: number;
+  period: string;
+  spent: number;
+  categories: {
+    id: string;
+    name: string;
+    icon: string;
+    color: string;
+  };
+};
+
 export default function DashboardScreen() {
   const navigation = useNavigation<any>();
   const [firstName, setFirstName] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [recurringTx, setRecurringTx] = useState<Transaction[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [limits, setLimits] = useState<LimitWithSpent[]>([]);
   const [monthIncome, setMonthIncome] = useState(0);
   const [monthExpenses, setMonthExpenses] = useState(0);
   const [monthSavings, setMonthSavings] = useState(0);
@@ -70,7 +84,6 @@ export default function DashboardScreen() {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
-    // Transacciones del mes con goal_id para separar gastos de ahorros
     const { data: monthTx } = await supabase
       .from('transactions')
       .select('base_amount, type, goal_id')
@@ -92,7 +105,6 @@ export default function DashboardScreen() {
       setMonthSavings(savings);
     }
 
-    // Últimas 10 NO recurrentes y NO ahorros para metas
     const { data: recentTx } = await supabase
       .from('transactions')
       .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, category_id, goal_id, categories(name, icon, color)')
@@ -104,7 +116,6 @@ export default function DashboardScreen() {
 
     if (recentTx) setTransactions(recentTx as any);
 
-    // Recurrentes
     const { data: recurring } = await supabase
       .from('transactions')
       .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, category_id, goal_id, categories(name, icon, color)')
@@ -113,7 +124,6 @@ export default function DashboardScreen() {
 
     if (recurring) setRecurringTx(recurring as any);
 
-    // Metas activas (top 3)
     const { data: goalsData } = await supabase
       .from('goals')
       .select('id, name, target_amount, current_amount, emoji')
@@ -123,6 +133,46 @@ export default function DashboardScreen() {
     if (goalsData) {
       setGoals(goalsData);
       setTotalInGoals(goalsData.reduce((sum, g) => sum + Number(g.current_amount), 0));
+    }
+
+    // Límites con gasto calculado
+    const { data: limitsData } = await supabase
+      .from('limits')
+      .select('id, amount, period, categories(id, name, icon, color)')
+      .order('created_at', { ascending: false });
+
+    if (limitsData && limitsData.length > 0) {
+      const limitsWithSpent: LimitWithSpent[] = [];
+
+      for (const limit of limitsData as any) {
+        let startDate: string;
+
+        if (limit.period === 'daily') {
+          startDate = now.toISOString().split('T')[0];
+        } else if (limit.period === 'weekly') {
+          const weekStart = new Date(now);
+          weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
+          startDate = weekStart.toISOString().split('T')[0];
+        } else {
+          startDate = startOfMonth;
+        }
+
+        const { data: txData } = await supabase
+          .from('transactions')
+          .select('base_amount')
+          .eq('category_id', limit.categories.id)
+          .eq('type', 'expense')
+          .gte('date', startDate)
+          .is('goal_id', null);
+
+        const spent = txData
+          ? txData.reduce((sum: number, t: any) => sum + Number(t.base_amount), 0)
+          : 0;
+
+        limitsWithSpent.push({ ...limit, spent });
+      }
+
+      setLimits(limitsWithSpent);
     }
 
     setLoading(false);
@@ -206,6 +256,12 @@ export default function DashboardScreen() {
     return Math.min((current / target) * 100, 100);
   };
 
+  const getLimitBarColor = (pct: number) => {
+    if (pct >= 100) return Colors.negative;
+    if (pct >= 80) return Colors.warning;
+    return Colors.primary;
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -237,7 +293,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* TARJETA SALDO — DINERO DISPONIBLE */}
+        {/* TARJETA SALDO */}
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>DINERO DISPONIBLE</Text>
           <Text style={[styles.balanceAmount, { color: available >= 0 ? '#fff' : Colors.negative }]}>
@@ -264,7 +320,7 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        {/* TARJETA — TU DINERO TOTAL */}
+        {/* TU DINERO TOTAL */}
         {totalInGoals > 0 && (
           <View style={styles.totalCard}>
             <Text style={styles.totalTitle}>Tu dinero total</Text>
@@ -286,6 +342,59 @@ export default function DashboardScreen() {
             </View>
           </View>
         )}
+
+        {/* LÍMITES */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Límites del mes</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Limits')}>
+              <Text style={styles.sectionLink}>Ver todos {'>'}</Text>
+            </TouchableOpacity>
+          </View>
+          {limits.length > 0 ? (
+            <View style={styles.card}>
+              {limits.slice(0, 3).map((limit, index) => {
+                const pct = Math.min((limit.spent / Number(limit.amount)) * 100, 100);
+                const barColor = getLimitBarColor(pct);
+                const isOver = limit.spent > Number(limit.amount);
+
+                return (
+                  <TouchableOpacity
+                    key={limit.id}
+                    style={[styles.limitRow, index < Math.min(limits.length, 3) - 1 && styles.txBorder]}
+                    onPress={() => navigation.navigate('Limits')}
+                    activeOpacity={0.6}
+                  >
+                    <View style={[styles.limitIcon, { backgroundColor: limit.categories.color + '15' }]}>
+                      <Text style={{ fontSize: 16 }}>{limit.categories.icon}</Text>
+                    </View>
+                    <View style={styles.limitInfo}>
+                      <View style={styles.limitTop}>
+                        <Text style={styles.txName}>{limit.categories.name}</Text>
+                        <Text style={[styles.limitAmount, isOver && { color: Colors.negative }]}>
+                          {formatMoney(limit.spent)}€ / {formatMoney(Number(limit.amount))}€
+                        </Text>
+                      </View>
+                      <View style={styles.limitBar}>
+                        <View style={[styles.limitBarFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.emptyCard}
+              onPress={() => navigation.navigate('Limits')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.emptyEmoji}>📊</Text>
+              <Text style={styles.emptyText}>Sin límites configurados</Text>
+              <Text style={styles.emptySub}>Toca aquí para establecer topes de gasto</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* GASTOS RECURRENTES */}
         {recurringTx.length > 0 && (
@@ -440,6 +549,7 @@ const styles = StyleSheet.create({
   section: { marginBottom: Spacing.lg },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
   sectionTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary },
+  sectionLink: { fontSize: FontSize.sm, color: Colors.primary },
   recurringTotal: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -453,6 +563,20 @@ const styles = StyleSheet.create({
   recurringTotalLabel: { fontSize: FontSize.sm, color: Colors.textSecondary },
   recurringTotalAmount: { fontSize: FontSize.md, fontWeight: '700', color: Colors.negative },
   card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.md, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
+  limitRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
+  limitIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  limitInfo: { flex: 1 },
+  limitTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  limitAmount: { fontSize: FontSize.xs, color: Colors.textSecondary },
+  limitBar: { height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden' },
+  limitBarFill: { height: '100%', borderRadius: 3 },
   recurringRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
   recurringRight: { alignItems: 'flex-end' },
   recurringAmount: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },

@@ -11,6 +11,8 @@ import ProfileScreen from '../screens/ProfileScreen';
 import GoalsScreen from '../screens/GoalsScreen';
 import AddGoalScreen from '../screens/AddGoalScreen';
 import GoalDetailScreen from '../screens/GoalDetailScreen';
+import LimitsScreen from '../screens/LimitsScreen';
+import AddLimitScreen from '../screens/AddLimitScreen';
 import AddButton from '../components/AddButton';
 
 const Tab = createBottomTabNavigator();
@@ -135,6 +137,16 @@ export default function Navigation() {
           name="GoalDetail"
           component={GoalDetailScreen}
           options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Limits"
+          component={LimitsScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="AddLimit"
+          component={AddLimitScreen}
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
