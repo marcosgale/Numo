@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LogOut, ChevronRight, User, CreditCard, Bell, Shield, CircleHelp } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 type Profile = {
   first_name: string;
@@ -14,6 +14,7 @@ type Profile = {
 };
 
 export default function ProfileScreen() {
+  const navigation = useNavigation<any>();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [email, setEmail] = useState('');
 
@@ -111,7 +112,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Ajustes</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.menuRow} onPress={() => Alert.alert('Próximamente', 'Podrás editar tu perfil aquí')}>
+            <TouchableOpacity style={styles.menuRow} onPress={() => navigation.navigate('EditProfile')}>
               <User size={20} color={Colors.textSecondary} />
               <Text style={styles.menuText}>Editar perfil</Text>
               <ChevronRight size={18} color={Colors.textSecondary} />

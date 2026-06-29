@@ -18,6 +18,7 @@ import CreateGroupScreen from '../screens/CreateGroupScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import AddGroupExpenseScreen from '../screens/AddGroupExpenseScreen';
 import HistoryScreen from '../screens/HistoryScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 import AddButton from '../components/AddButton';
 
 const Tab = createBottomTabNavigator();
@@ -164,6 +165,11 @@ export default function Navigation() {
           name="History"
           component={HistoryScreen}
           options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="EditProfile"
+          component={EditProfileScreen}
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
