@@ -135,7 +135,6 @@ export default function DashboardScreen() {
       setTotalInGoals(goalsData.reduce((sum, g) => sum + Number(g.current_amount), 0));
     }
 
-    // Límites con gasto calculado
     const { data: limitsData } = await supabase
       .from('limits')
       .select('id, amount, period, categories(id, name, icon, color)')
@@ -473,6 +472,9 @@ export default function DashboardScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Últimos movimientos</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('History')}>
+              <Text style={styles.sectionLink}>Ver todos {'>'}</Text>
+            </TouchableOpacity>
           </View>
           {transactions.length > 0 ? (
             <View style={styles.card}>
