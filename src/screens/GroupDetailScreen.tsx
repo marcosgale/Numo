@@ -294,10 +294,14 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     );
   }
 
-  const totalGroupExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const totalGroupExpenses = expenses.reduce((sum, e) => sum + Number(e.base_amount ?? e.amount), 0);
   const mySpent = expenses.reduce((sum, e) => {
     const mySplit = e.splits.find(s => s.userId === currentUserId);
-    return sum + (mySplit ? mySplit.amount : 0);
+    if (!mySplit) return sum;
+    const rawTotal = Number(e.amount);
+    const baseAmt = Number(e.base_amount ?? e.amount);
+    const myBase = rawTotal > 0 ? (mySplit.amount / rawTotal) * baseAmt : mySplit.amount;
+    return sum + myBase;
   }, 0);
   const groupCurrencySymbol = getCurrencySymbol(group.currency || 'EUR');
 
@@ -552,7 +556,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         <Text style={styles.modalSplitName}>
                           {split.userId === currentUserId ? 'Tú' : split.name.split(' ')[0]}
                         </Text>
-                        <Text style={styles.modalSplitAmount}>{formatMoney(split.amount)}€</Text>
+                        <Text style={styles.modalSplitAmount}>{formatMoney(split.amount)}{getCurrencySymbol(selectedExpense.currency)}</Text>
                       </View>
                     ))}
                   </View>

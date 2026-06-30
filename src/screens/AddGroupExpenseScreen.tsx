@@ -88,6 +88,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
   const [selectedMembers, setSelectedMembers] = useState<string[]>(members.map(m => m.user_id));
   const [currentUserId, setCurrentUserId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [titleError, setTitleError] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -180,7 +181,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
       return;
     }
     if (!description.trim()) {
-      Alert.alert('Error', 'Añade un título al gasto');
+      setTitleError(true);
       return;
     }
     if (!paidBy) {
@@ -302,14 +303,22 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
         >
           {/* TÍTULO */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Título</Text>
+            <Text style={styles.sectionLabel}>
+              Título <Text style={{ color: Colors.negative }}>*</Text>
+            </Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, titleError && styles.inputError]}
               placeholder="Ej: Cena, supermercado, Airbnb..."
               placeholderTextColor={Colors.textSecondary}
               value={description}
-              onChangeText={setDescription}
+              onChangeText={(text) => {
+                setDescription(text);
+                if (titleError && text.trim()) setTitleError(false);
+              }}
             />
+            {titleError && (
+              <Text style={styles.errorText}>El título es obligatorio</Text>
+            )}
           </View>
 
           {/* IMPORTE + MONEDA */}
@@ -499,6 +508,8 @@ const styles = StyleSheet.create({
   container: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
   section: { marginBottom: Spacing.lg },
   sectionLabel: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.textSecondary, marginBottom: Spacing.sm },
+  inputError: { borderWidth: 1.5, borderColor: Colors.negative },
+  errorText: { fontSize: FontSize.xs, color: Colors.negative, marginTop: 4, marginLeft: 2 },
   input: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.md,
