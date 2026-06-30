@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, Keyboard, TouchableWithoutFeedback, ScrollView
+  Alert, Keyboard, TouchableWithoutFeedback, ScrollView, Share, Platform, KeyboardAvoidingView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Copy } from 'lucide-react-native';
@@ -10,6 +10,14 @@ import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 
 const EMOJIS = ['👥', '🏠', '✈️', '🍽️', '🎉', '🏋️', '🎓', '💼', '🎮', '🏖️', '🚗', '❤️', '🎵', '⚽', '🛒', '🍕'];
+
+const CURRENCIES = [
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'USD', symbol: '$', name: 'Dólar' },
+  { code: 'GBP', symbol: '£', name: 'Libra' },
+  { code: 'CHF', symbol: 'Fr', name: 'Franco' },
+  { code: 'JPY', symbol: '¥', name: 'Yen' },
+];
 
 const generateCode = (): string => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -23,8 +31,11 @@ const generateCode = (): string => {
 export default function CreateGroupScreen({ navigation }: any) {
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('👥');
+  const [currency, setCurrency] = useState('EUR');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const [createdGroupName, setCreatedGroupName] = useState('');
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -35,19 +46,16 @@ export default function CreateGroupScreen({ navigation }: any) {
     setLoading(true);
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    if (!user) { setLoading(false); return; }
 
     const inviteCode = generateCode();
 
-    // Crear grupo
     const { data: group, error: groupError } = await supabase
       .from('groups')
       .insert({
         name: name.trim(),
-        emoji: emoji,
+        emoji,
+        currency,
         created_by: user.id,
         invite_code: inviteCode,
       })
@@ -60,19 +68,16 @@ export default function CreateGroupScreen({ navigation }: any) {
       return;
     }
 
-    // Añadirme como miembro
     const { error: memberError } = await supabase
       .from('group_members')
-      .insert({
-        group_id: group.id,
-        user_id: user.id,
-      });
+      .insert({ group_id: group.id, user_id: user.id });
 
     setLoading(false);
 
     if (memberError) {
       Alert.alert('Error', memberError.message);
     } else {
+      setCreatedGroupName(name.trim());
       setCreatedCode(inviteCode);
     }
   };
@@ -84,27 +89,39 @@ export default function CreateGroupScreen({ navigation }: any) {
     }
   };
 
-  // Pantalla de éxito con código
+  const handleShare = async () => {
+    if (createdCode) {
+      await Share.share({
+        message: `¡Únete a mi grupo "${createdGroupName}" en Numo! Código: ${createdCode}`,
+      });
+    }
+  };
+
   if (createdCode) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.successContainer}>
           <Text style={styles.successEmoji}>🎉</Text>
           <Text style={styles.successTitle}>¡Grupo creado!</Text>
-          <Text style={styles.successSub}>Comparte este código para que se unan tus amigos</Text>
+          <Text style={styles.successSub}>
+            Comparte este código para que tus amigos se unan
+          </Text>
 
           <View style={styles.codeCard}>
+            <Text style={styles.codeLabel}>Código de invitación</Text>
             <Text style={styles.codeText}>{createdCode}</Text>
-            <TouchableOpacity style={styles.copyBtn} onPress={handleCopyCode}>
-              <Copy size={18} color={Colors.primary} />
-              <Text style={styles.copyText}>Copiar código</Text>
-            </TouchableOpacity>
+            <View style={styles.codeButtons}>
+              <TouchableOpacity style={styles.codeBtn} onPress={handleCopyCode}>
+                <Copy size={16} color={Colors.primary} />
+                <Text style={styles.codeBtnText}>Copiar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.codeBtn, styles.codeBtnShare]} onPress={handleShare}>
+                <Text style={styles.codeBtnShareText}>Compartir</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <TouchableOpacity
-            style={styles.doneButton}
-            onPress={() => navigation.goBack()}
-          >
+          <TouchableOpacity style={styles.doneButton} onPress={() => navigation.goBack()}>
             <Text style={styles.doneButtonText}>Ir al grupo</Text>
           </TouchableOpacity>
         </View>
@@ -113,62 +130,106 @@ export default function CreateGroupScreen({ navigation }: any) {
   }
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <ChevronLeft size={28} color={Colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Nuevo grupo</Text>
-          <View style={{ width: 28 }} />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={styles.container}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* EMOJI */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Elige un icono</Text>
-            <View style={styles.emojiGrid}>
-              {EMOJIS.map((e) => (
-                <TouchableOpacity
-                  key={e}
-                  style={[styles.emojiChip, emoji === e && styles.emojiChipActive]}
-                  onPress={() => setEmoji(e)}
-                >
-                  <Text style={styles.emojiText}>{e}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <SafeAreaView style={styles.safe}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <ChevronLeft size={28} color={Colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Nuevo grupo</Text>
+            <View style={{ width: 28 }} />
           </View>
 
-          {/* NOMBRE */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Nombre del grupo</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ej: Piso Madrid, Viaje Ibiza, Trabajo..."
-              placeholderTextColor={Colors.textSecondary}
-              value={name}
-              onChangeText={setName}
-              autoFocus
-            />
-          </View>
-
-          {/* BOTÓN */}
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleCreate}
-            disabled={loading}
+          <ScrollView
+            contentContainerStyle={styles.container}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
-            <Text style={styles.buttonText}>
-              {loading ? 'Creando...' : 'Crear grupo'}
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+            {/* EMOJI */}
+            <View style={styles.emojiSection}>
+              <TouchableOpacity
+                style={styles.emojiButton}
+                onPress={() => setShowEmojiPicker(v => !v)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.emojiCircle}>
+                  <Text style={styles.emojiLarge}>{emoji}</Text>
+                </View>
+                <Text style={styles.emojiHint}>
+                  {showEmojiPicker ? 'Cerrar' : 'Cambiar icono'}
+                </Text>
+              </TouchableOpacity>
+
+              {showEmojiPicker && (
+                <View style={styles.emojiGrid}>
+                  {EMOJIS.map(e => (
+                    <TouchableOpacity
+                      key={e}
+                      style={[styles.emojiChip, emoji === e && styles.emojiChipActive]}
+                      onPress={() => { setEmoji(e); setShowEmojiPicker(false); }}
+                    >
+                      <Text style={styles.emojiChipText}>{e}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* NOMBRE */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Nombre del grupo</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ej: Piso Madrid, Viaje Ibiza, Trabajo..."
+                placeholderTextColor={Colors.textSecondary}
+                value={name}
+                onChangeText={setName}
+              />
+            </View>
+
+            {/* MONEDA */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Moneda del grupo</Text>
+              <View style={styles.currencyRow}>
+                {CURRENCIES.map(c => {
+                  const isActive = currency === c.code;
+                  return (
+                    <TouchableOpacity
+                      key={c.code}
+                      style={[styles.currencyChip, isActive && styles.currencyChipActive]}
+                      onPress={() => setCurrency(c.code)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.currencySymbol, isActive && styles.currencyTextActive]}>
+                        {c.symbol}
+                      </Text>
+                      <Text style={[styles.currencyCode, isActive && styles.currencyTextActive]}>
+                        {c.code}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleCreate}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? 'Creando...' : 'Crear grupo'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -183,21 +244,51 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary },
   container: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
-  section: { marginBottom: Spacing.lg },
-  sectionLabel: { fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.sm },
-  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  emojiSection: { alignItems: 'center', marginBottom: Spacing.lg },
+  emojiButton: { alignItems: 'center', marginBottom: Spacing.sm },
+  emojiCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+    marginBottom: Spacing.xs,
+  },
+  emojiLarge: { fontSize: 44 },
+  emojiHint: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600' },
+  emojiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
+  },
   emojiChip: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
   },
   emojiChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '15' },
-  emojiText: { fontSize: 24 },
+  emojiChipText: { fontSize: 24 },
+  section: { marginBottom: Spacing.lg },
+  sectionLabel: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.textSecondary, marginBottom: Spacing.sm },
   input: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.md,
@@ -205,6 +296,24 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     color: Colors.textPrimary,
   },
+  currencyRow: { flexDirection: 'row', gap: Spacing.sm },
+  currencyChip: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    gap: 2,
+  },
+  currencyChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  currencySymbol: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
+  currencyCode: { fontSize: 10, fontWeight: '600', color: Colors.textSecondary },
+  currencyTextActive: { color: '#fff' },
   button: {
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.md,
@@ -222,7 +331,7 @@ const styles = StyleSheet.create({
   },
   successEmoji: { fontSize: 64, marginBottom: Spacing.md },
   successTitle: { fontSize: 24, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
-  successSub: { fontSize: FontSize.md, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.lg },
+  successSub: { fontSize: FontSize.md, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.xl },
   codeCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,
@@ -235,6 +344,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 1,
   },
+  codeLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, marginBottom: Spacing.sm },
   codeText: {
     fontSize: 40,
     fontWeight: '700',
@@ -242,12 +352,19 @@ const styles = StyleSheet.create({
     letterSpacing: 8,
     marginBottom: Spacing.md,
   },
-  copyBtn: {
+  codeButtons: { flexDirection: 'row', gap: Spacing.sm },
+  codeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
+    backgroundColor: Colors.primary + '15',
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
   },
-  copyText: { fontSize: FontSize.md, color: Colors.primary, fontWeight: '600' },
+  codeBtnText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600' },
+  codeBtnShare: { backgroundColor: Colors.primary },
+  codeBtnShareText: { fontSize: FontSize.sm, color: '#fff', fontWeight: '600' },
   doneButton: {
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.md,

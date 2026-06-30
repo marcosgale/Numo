@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, LogIn } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -30,7 +29,6 @@ export default function GroupsScreen() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Grupos donde soy miembro
         const { data: memberships } = await supabase
           .from('group_members')
           .select('group_id')
@@ -51,19 +49,13 @@ export default function GroupsScreen() {
 
         if (groupsData) {
           const groupsWithCount: Group[] = [];
-
           for (const group of groupsData) {
             const { count } = await supabase
               .from('group_members')
               .select('*', { count: 'exact', head: true })
               .eq('group_id', group.id);
-
-            groupsWithCount.push({
-              ...group,
-              memberCount: count || 0,
-            });
+            groupsWithCount.push({ ...group, memberCount: count || 0 });
           }
-
           setGroups(groupsWithCount);
         }
 
@@ -82,12 +74,8 @@ export default function GroupsScreen() {
     setJoining(true);
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setJoining(false);
-      return;
-    }
+    if (!user) { setJoining(false); return; }
 
-    // Buscar grupo por código
     const { data: group } = await supabase
       .from('groups')
       .select('id, name')
@@ -100,7 +88,6 @@ export default function GroupsScreen() {
       return;
     }
 
-    // Verificar si ya soy miembro
     const { data: existing } = await supabase
       .from('group_members')
       .select('id')
@@ -116,7 +103,6 @@ export default function GroupsScreen() {
       return;
     }
 
-    // Unirse
     const { error } = await supabase.from('group_members').insert({
       group_id: group.id,
       user_id: user.id,
@@ -128,13 +114,7 @@ export default function GroupsScreen() {
       Alert.alert('Error', error.message);
     } else {
       Alert.alert('¡Te has unido!', `Ahora eres miembro de "${group.name}"`, [
-        {
-          text: 'OK',
-          onPress: () => {
-            setJoinModalVisible(false);
-            setJoinCode('');
-          },
-        },
+        { text: 'OK', onPress: () => { setJoinModalVisible(false); setJoinCode(''); } },
       ]);
     }
   };
@@ -157,40 +137,43 @@ export default function GroupsScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Grupos</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => setJoinModalVisible(true)}
-            >
-              <LogIn size={18} color={Colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.addBtn}
-              onPress={() => navigation.navigate('CreateGroup')}
-            >
-              <Plus size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
         </View>
 
         {groups.length > 0 ? (
-          groups.map((group) => (
-            <TouchableOpacity
-              key={group.id}
-              style={styles.groupCard}
-              onPress={() => navigation.navigate('GroupDetail', { groupId: group.id })}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.groupEmoji}>{group.emoji || '👥'}</Text>
-              <View style={styles.groupInfo}>
-                <Text style={styles.groupName}>{group.name}</Text>
-                <Text style={styles.groupMembers}>
-                  {group.memberCount} {group.memberCount === 1 ? 'miembro' : 'miembros'}
-                </Text>
-              </View>
-              <Text style={styles.groupArrow}>{'>'}</Text>
-            </TouchableOpacity>
-          ))
+          <>
+            {groups.map((group) => (
+              <TouchableOpacity
+                key={group.id}
+                style={styles.groupCard}
+                onPress={() => navigation.navigate('GroupDetail', { groupId: group.id })}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.groupEmoji}>{group.emoji || '👥'}</Text>
+                <View style={styles.groupInfo}>
+                  <Text style={styles.groupName}>{group.name}</Text>
+                  <Text style={styles.groupMembers}>
+                    {group.memberCount} {group.memberCount === 1 ? 'miembro' : 'miembros'}
+                  </Text>
+                </View>
+                <Text style={styles.groupArrow}>›</Text>
+              </TouchableOpacity>
+            ))}
+
+            <View style={styles.actionsSection}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('CreateGroup')}
+              >
+                <Text style={styles.actionButtonText}>Crear nuevo grupo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButtonOutline}
+                onPress={() => setJoinModalVisible(true)}
+              >
+                <Text style={styles.actionButtonOutlineText}>Unirse con código</Text>
+              </TouchableOpacity>
+            </View>
+          </>
         ) : (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyEmoji}>👥</Text>
@@ -216,7 +199,6 @@ export default function GroupsScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* MODAL UNIRSE */}
       <Modal
         visible={joinModalVisible}
         transparent
@@ -262,25 +244,8 @@ export default function GroupsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   container: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.lg },
+  header: { marginBottom: Spacing.lg },
   headerTitle: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.textPrimary },
-  headerActions: { flexDirection: 'row', gap: Spacing.sm },
-  actionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.primary + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   groupCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -297,7 +262,24 @@ const styles = StyleSheet.create({
   groupInfo: { flex: 1 },
   groupName: { fontSize: FontSize.md, fontWeight: '600', color: Colors.textPrimary },
   groupMembers: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
-  groupArrow: { fontSize: FontSize.lg, color: Colors.textSecondary },
+  groupArrow: { fontSize: 22, color: Colors.textSecondary },
+  actionsSection: { marginTop: Spacing.lg, gap: Spacing.sm },
+  actionButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    alignItems: 'center',
+  },
+  actionButtonText: { color: '#fff', fontSize: FontSize.md, fontWeight: '700' },
+  actionButtonOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    alignItems: 'center',
+  },
+  actionButtonOutlineText: { color: Colors.primary, fontSize: FontSize.md, fontWeight: '700' },
   emptyCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,
