@@ -49,6 +49,12 @@ type Debt = {
   amount: number;
 };
 
+type Settlement = {
+  from_user_id: string;
+  to_user_id: string;
+  amount: number;
+};
+
 type Tab = 'gastos' | 'balances' | 'miembros';
 
 export default function GroupDetailScreen({ route, navigation }: any) {
@@ -154,6 +160,19 @@ export default function GroupDetailScreen({ route, navigation }: any) {
           ? (Number(split.amount) / rawTotal) * expBaseAmount
           : Number(split.amount);
         balanceMap[split.user_id] = (balanceMap[split.user_id] || 0) - splitBase;
+      }
+    }
+
+    // Aplicar settlements al balance
+    const { data: settlementsData } = await supabase
+      .from('group_settlements')
+      .select('from_user_id, to_user_id, amount')
+      .eq('group_id', groupId);
+
+    if (settlementsData) {
+      for (const s of settlementsData) {
+        balanceMap[s.from_user_id] = (balanceMap[s.from_user_id] || 0) + Number(s.amount);
+        balanceMap[s.to_user_id] = (balanceMap[s.to_user_id] || 0) - Number(s.amount);
       }
     }
 
@@ -280,6 +299,46 @@ export default function GroupDetailScreen({ route, navigation }: any) {
               setSelectedExpense(null);
               fetchData();
             }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSettle = (debt: Debt) => {
+    Alert.alert(
+      'Confirmar pago recibido',
+      `¿Confirmas que ${debt.fromName.split(' ')[0]} te ha pagado ${formatMoney(debt.amount)}${groupCurrencySymbol}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          onPress: async () => {
+            const today = new Date().toISOString().split('T')[0];
+
+            const { error } = await supabase.from('group_settlements').insert({
+              group_id: groupId,
+              from_user_id: debt.from,
+              to_user_id: currentUserId,
+              amount: debt.amount,
+              currency: group?.currency || 'EUR',
+              date: today,
+            });
+
+            if (error) { Alert.alert('Error', error.message); return; }
+
+            await supabase.from('transactions').insert({
+              user_id: currentUserId,
+              type: 'income',
+              amount: debt.amount,
+              base_amount: debt.amount,
+              currency: group?.currency || 'EUR',
+              description: `Cobrado de ${debt.fromName.split(' ')[0]}`,
+              date: today,
+              is_recurring: false,
+            });
+
+            fetchData();
           },
         },
       ]
@@ -415,13 +474,22 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         {debt.to === currentUserId ? 'ti' : debt.toName.split(' ')[0]}
                       </Text>
                     </Text>
+                    <Text style={styles.debtAmountSub}>
+                      {formatMoney(debt.amount)}{groupCurrencySymbol}
+                    </Text>
                   </View>
-                  <Text style={[
-                    styles.debtAmount,
-                    { color: debt.from === currentUserId ? Colors.negative : Colors.positive }
-                  ]}>
-                    {formatMoney(debt.amount)}{groupCurrencySymbol}
-                  </Text>
+                  {debt.to === currentUserId ? (
+                    <TouchableOpacity
+                      style={styles.settleBtn}
+                      onPress={() => handleSettle(debt)}
+                    >
+                      <Text style={styles.settleBtnText}>Cobrado ✓</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={[styles.debtAmount, { color: Colors.negative }]}>
+                      {formatMoney(debt.amount)}{groupCurrencySymbol}
+                    </Text>
+                  )}
                 </View>
               ))}
             </View>
@@ -721,7 +789,15 @@ const makeStyles = (Colors: any) => StyleSheet.create({
   debtRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
   debtInfo: { flex: 1 },
   debtText: { fontSize: FontSize.md },
+  debtAmountSub: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
   debtAmount: { fontSize: FontSize.md, fontWeight: '700' },
+  settleBtn: {
+    backgroundColor: Colors.positive + '15',
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+  },
+  settleBtnText: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.positive },
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
   memberAvatar: {
     width: 36,
