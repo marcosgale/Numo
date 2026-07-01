@@ -18,6 +18,7 @@ type Transaction = {
   currency: string;
   category_id: string | null;
   goal_id: string | null;
+  group_expense_id: string | null;
   categories: {
     name: string;
     icon: string;
@@ -48,7 +49,7 @@ export default function HistoryScreen({ navigation }: any) {
 
     let query = supabase
       .from('transactions')
-      .select('id, amount, type, description, date, is_recurring, currency, category_id, goal_id, categories(name, icon, color)')
+      .select('id, amount, type, description, date, is_recurring, currency, category_id, goal_id, group_expense_id, categories(name, icon, color)')
       .is('goal_id', null)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
@@ -149,33 +150,36 @@ export default function HistoryScreen({ navigation }: any) {
             <View key={date} style={styles.dateGroup}>
               <Text style={styles.dateHeader}>{formatDate(date)}</Text>
               <View style={styles.card}>
-                {txs.map((tx, index) => (
-                  <TouchableOpacity
-                    key={tx.id}
-                    style={[styles.txRow, index < txs.length - 1 && styles.txBorder]}
-                    onPress={() => handleEdit(tx)}
-                    activeOpacity={0.6}
-                  >
-                    <View style={[styles.txIcon, { backgroundColor: (tx.categories?.color || '#8E8E93') + '15' }]}>
-                      <Text style={{ fontSize: 18 }}>{tx.categories?.icon || '📦'}</Text>
-                    </View>
-                    <View style={styles.txInfo}>
-                      <Text style={styles.txName}>
-                        {tx.description || tx.categories?.name || 'Sin concepto'}
-                      </Text>
-                      <Text style={styles.txCategory}>
-                        {tx.categories?.name || 'Sin categoría'}
-                        {tx.is_recurring ? ' · 🔄' : ''}
-                      </Text>
-                    </View>
-                    <Text style={[
-                      styles.txAmount,
-                      { color: tx.type === 'income' ? Colors.positive : Colors.textPrimary }
-                    ]}>
-                      {tx.type === 'income' ? '+' : '-'}{formatMoney(tx.amount)} {tx.currency === 'EUR' ? '€' : tx.currency}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {txs.map((tx, index) => {
+                    const isGroup = !!tx.group_expense_id;
+                    return (
+                      <TouchableOpacity
+                        key={tx.id}
+                        style={[styles.txRow, index < txs.length - 1 && styles.txBorder]}
+                        onPress={isGroup ? undefined : () => handleEdit(tx)}
+                        activeOpacity={isGroup ? 1 : 0.6}
+                      >
+                        <View style={[styles.txIcon, { backgroundColor: isGroup ? '#1DB87A15' : (tx.categories?.color || '#8E8E93') + '15' }]}>
+                          <Text style={{ fontSize: 18 }}>{isGroup ? '👥' : (tx.categories?.icon || '📦')}</Text>
+                        </View>
+                        <View style={styles.txInfo}>
+                          <Text style={styles.txName}>
+                            {tx.description || tx.categories?.name || 'Sin concepto'}
+                          </Text>
+                          <Text style={styles.txCategory}>
+                            {isGroup ? 'Gasto compartido' : (tx.categories?.name || 'Sin categoría')}
+                            {tx.is_recurring ? ' · 🔄' : ''}
+                          </Text>
+                        </View>
+                        <Text style={[
+                          styles.txAmount,
+                          { color: tx.type === 'income' ? Colors.positive : Colors.textPrimary }
+                        ]}>
+                          {tx.type === 'income' ? '+' : '-'}{formatMoney(tx.amount)} {tx.currency === 'EUR' ? '€' : tx.currency}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
               </View>
             </View>
           ))}

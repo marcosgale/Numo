@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Home, Users, Target, User, Plus } from 'lucide-react-native';
+import { Home, Users, TrendingUp, User, Plus } from 'lucide-react-native';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useColors } from '../constants/theme';
 import DashboardScreen from '../screens/DashboardScreen';
@@ -99,10 +99,10 @@ function MainTabs({ navigation }: any) {
           }}
         />
         <Tab.Screen
-          name="Metas"
+          name="Planifica"
           component={GoalsScreen}
           options={{
-            tabBarIcon: ({ color }) => <Target size={22} color={color} />,
+            tabBarIcon: ({ color }) => <TrendingUp size={22} color={color} />,
           }}
         />
         <Tab.Screen

@@ -18,6 +18,7 @@ type Transaction = {
   currency: string;
   category_id: string | null;
   goal_id: string | null;
+  group_expense_id: string | null;
   categories: {
     name: string;
     icon: string;
@@ -109,7 +110,7 @@ export default function DashboardScreen() {
 
     const { data: recentTx } = await supabase
       .from('transactions')
-      .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, category_id, goal_id, categories(name, icon, color)')
+      .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, category_id, goal_id, group_expense_id, categories(name, icon, color)')
       .eq('is_recurring', false)
       .is('goal_id', null)
       .order('date', { ascending: false })
@@ -480,27 +481,30 @@ export default function DashboardScreen() {
           </View>
           {transactions.length > 0 ? (
             <View style={styles.card}>
-              {transactions.map((tx, index) => (
+              {transactions.map((tx, index) => {
+                  const isGroup = !!tx.group_expense_id;
+                  return (
                 <TouchableOpacity
                   key={tx.id}
                   style={[styles.txRow, index < transactions.length - 1 && styles.txBorder]}
-                  onPress={() => handleEditTransaction(tx)}
-                  activeOpacity={0.6}
+                  onPress={isGroup ? undefined : () => handleEditTransaction(tx)}
+                  activeOpacity={isGroup ? 1 : 0.6}
                 >
-                  <View style={[styles.txIcon, { backgroundColor: (tx.categories?.color || '#8E8E93') + '15' }]}>
-                    <Text style={{ fontSize: 18 }}>{tx.categories?.icon || '📦'}</Text>
+                  <View style={[styles.txIcon, { backgroundColor: isGroup ? '#1DB87A15' : (tx.categories?.color || '#8E8E93') + '15' }]}>
+                    <Text style={{ fontSize: 18 }}>{isGroup ? '👥' : (tx.categories?.icon || '📦')}</Text>
                   </View>
                   <View style={styles.txInfo}>
                     <Text style={styles.txName}>{tx.description || tx.categories?.name || 'Sin concepto'}</Text>
                     <Text style={styles.txCategory}>
-                      {tx.categories?.name || 'Sin categoría'} · {formatDate(tx.date)}
+                      {isGroup ? 'Gasto compartido' : (tx.categories?.name || 'Sin categoría')} · {formatDate(tx.date)}
                     </Text>
                   </View>
                   <Text style={[styles.txAmount, { color: tx.type === 'income' ? Colors.positive : Colors.textPrimary }]}>
                     {tx.type === 'income' ? '+' : '-'}{formatMoney(tx.amount)} {tx.currency === 'EUR' ? '€' : tx.currency}
                   </Text>
                 </TouchableOpacity>
-              ))}
+                  );
+              })}
             </View>
           ) : (
             <View style={styles.emptyCard}>
