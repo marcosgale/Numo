@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, Trash2 } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
@@ -21,6 +21,8 @@ type Limit = {
 type SpentMap = { [categoryId: string]: number };
 
 export default function LimitsScreen() {
+  const Colors = useColors();
+  const styles = makeStyles(Colors);
   const navigation = useNavigation<any>();
   const [limits, setLimits] = useState<Limit[]>([]);
   const [spent, setSpent] = useState<SpentMap>({});
@@ -215,7 +217,7 @@ export default function LimitsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   container: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.lg },

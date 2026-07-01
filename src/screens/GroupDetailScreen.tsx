@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Plus, Copy, LogOut } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
-import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -52,6 +52,8 @@ type Debt = {
 type Tab = 'gastos' | 'balances' | 'miembros';
 
 export default function GroupDetailScreen({ route, navigation }: any) {
+  const Colors = useColors();
+  const styles = makeStyles(Colors);
   const { groupId } = route.params;
   const [group, setGroup] = useState<any>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -600,7 +602,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: 'row',

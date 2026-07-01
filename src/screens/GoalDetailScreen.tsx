@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Edit3, Trash2 } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -21,6 +21,8 @@ type Goal = {
 };
 
 export default function GoalDetailScreen({ route, navigation }: any) {
+  const Colors = useColors();
+  const styles = makeStyles(Colors);
   const { goalId } = route.params;
   const [goal, setGoal] = useState<Goal | null>(null);
   const [addAmount, setAddAmount] = useState('');
@@ -269,7 +271,7 @@ export default function GoalDetailScreen({ route, navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: 'row',

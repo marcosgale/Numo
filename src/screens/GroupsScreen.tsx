@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
@@ -14,6 +14,8 @@ type Group = {
 };
 
 export default function GroupsScreen() {
+  const Colors = useColors();
+  const styles = makeStyles(Colors);
   const navigation = useNavigation<any>();
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -241,7 +243,7 @@ export default function GroupsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   container: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   header: { marginBottom: Spacing.lg },

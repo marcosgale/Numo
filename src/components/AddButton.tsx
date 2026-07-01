@@ -1,7 +1,6 @@
-import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable } from 'react-native';
 import { Plus, X, TrendingDown, TrendingUp, Users, RefreshCw } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 
 type AddButtonProps = {
   visible: boolean;
@@ -10,10 +9,15 @@ type AddButtonProps = {
 };
 
 export default function AddButton({ visible, onClose, onSelectOption }: AddButtonProps) {
+  const Colors = useColors();
+  const styles = makeStyles(Colors);
+
   const handleSelect = (option: 'expense' | 'income' | 'shared' | 'recurring') => {
     onClose();
     onSelectOption(option);
   };
+
+  const isDark = Colors.background === '#000000';
 
   return (
     <Modal
@@ -35,7 +39,7 @@ export default function AddButton({ visible, onClose, onSelectOption }: AddButto
 
           <View style={styles.grid}>
             <TouchableOpacity
-              style={[styles.gridItem, { backgroundColor: '#FFE5E5' }]}
+              style={[styles.gridItem, { backgroundColor: isDark ? '#3A1212' : '#FFE5E5' }]}
               onPress={() => handleSelect('expense')}
             >
               <View style={styles.iconCircle}>
@@ -45,7 +49,7 @@ export default function AddButton({ visible, onClose, onSelectOption }: AddButto
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.gridItem, { backgroundColor: '#E5F8EE' }]}
+              style={[styles.gridItem, { backgroundColor: isDark ? '#0A2A15' : '#E5F8EE' }]}
               onPress={() => handleSelect('income')}
             >
               <View style={styles.iconCircle}>
@@ -55,7 +59,7 @@ export default function AddButton({ visible, onClose, onSelectOption }: AddButto
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.gridItem, { backgroundColor: '#F0E5FF' }]}
+              style={[styles.gridItem, { backgroundColor: isDark ? '#1E0A2A' : '#F0E5FF' }]}
               onPress={() => handleSelect('shared')}
             >
               <View style={styles.iconCircle}>
@@ -65,7 +69,7 @@ export default function AddButton({ visible, onClose, onSelectOption }: AddButto
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.gridItem, { backgroundColor: '#E5F0FF' }]}
+              style={[styles.gridItem, { backgroundColor: isDark ? '#0A1A2A' : '#E5F0FF' }]}
               onPress={() => handleSelect('recurring')}
             >
               <View style={styles.iconCircle}>
@@ -80,7 +84,7 @@ export default function AddButton({ visible, onClose, onSelectOption }: AddButto
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: any) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -129,7 +133,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'rgba(128,128,128,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.sm,

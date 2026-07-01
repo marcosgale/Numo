@@ -3,8 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Home, Users, Target, User, Plus } from 'lucide-react-native';
-import { View, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Colors } from '../constants/theme';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { useColors } from '../constants/theme';
 import DashboardScreen from '../screens/DashboardScreen';
 import AddTransactionScreen from '../screens/AddTransactionScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -17,7 +17,12 @@ import GroupsScreen from '../screens/GroupsScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import AddGroupExpenseScreen from '../screens/AddGroupExpenseScreen';
+import SelectGroupScreen from '../screens/SelectGroupScreen';
 import HistoryScreen from '../screens/HistoryScreen';
+import CategoriesScreen from '../screens/CategoriesScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import PrivacyScreen from '../screens/PrivacyScreen';
+import HelpScreen from '../screens/HelpScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import AddButton from '../components/AddButton';
 
@@ -29,11 +34,13 @@ function EmptyScreen() {
 }
 
 function MainTabs({ navigation }: any) {
+  const Colors = useColors();
   const [modalVisible, setModalVisible] = useState(false);
 
   const handleAddOption = (option: 'expense' | 'income' | 'shared' | 'recurring') => {
     if (option === 'shared') {
-      Alert.alert('Próximamente', 'Los gastos compartidos estarán disponibles pronto');
+      setModalVisible(false);
+      navigation.navigate('SelectGroup');
       return;
     }
 
@@ -117,9 +124,10 @@ function MainTabs({ navigation }: any) {
 }
 
 export default function Navigation() {
+  const Colors = useColors();
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.background } }}>
         <Stack.Screen name="MainTabs" component={MainTabs} />
         <Stack.Screen
           name="AddTransaction"
@@ -162,6 +170,11 @@ export default function Navigation() {
           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
         />
         <Stack.Screen
+          name="SelectGroup"
+          component={SelectGroupScreen}
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
           name="History"
           component={HistoryScreen}
           options={{ animation: 'slide_from_right' }}
@@ -170,6 +183,26 @@ export default function Navigation() {
           name="EditProfile"
           component={EditProfileScreen}
           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="Categories"
+          component={CategoriesScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Privacy"
+          component={PrivacyScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Help"
+          component={HelpScreen}
+          options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
@@ -181,7 +214,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#1DB87A',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',

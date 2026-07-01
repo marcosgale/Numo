@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronDown, Trash2 } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 
 type Category = {
@@ -50,6 +50,8 @@ const PERIODS = [
 ];
 
 export default function AddTransactionScreen({ route, navigation }: any) {
+  const Colors = useColors();
+  const styles = makeStyles(Colors);
   const { type, isRecurring, transaction } = route.params;
   const isEditing = !!transaction;
 
@@ -571,7 +573,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: 'row',

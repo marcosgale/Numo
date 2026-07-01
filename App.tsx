@@ -7,6 +7,7 @@ import { supabase } from './src/services/supabase';
 import Navigation from './src/navigation';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import { ThemeProvider } from './src/contexts/ThemeContext';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -39,14 +40,18 @@ export default function App() {
   if (showOnboarding) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <OnboardingScreen onComplete={() => setShowOnboarding(false)} />
+        <ThemeProvider>
+          <OnboardingScreen onComplete={() => setShowOnboarding(false)} />
+        </ThemeProvider>
       </GestureHandlerRootView>
     );
   }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {session ? <Navigation /> : <AuthNavigator />}
+      <ThemeProvider>
+        {session ? <Navigation /> : <AuthNavigator />}
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 
 const CURRENCIES = [
@@ -21,6 +21,8 @@ const CURRENCIES = [
 ];
 
 export default function EditProfileScreen({ navigation }: any) {
+  const Colors = useColors();
+  const styles = makeStyles(Colors);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [currency, setCurrency] = useState('EUR');
@@ -176,7 +178,7 @@ export default function EditProfileScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: 'row',

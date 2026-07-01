@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 import { TextInput } from 'react-native';
 
@@ -23,6 +23,8 @@ const PERIODS = [
 ];
 
 export default function AddLimitScreen({ navigation }: any) {
+  const Colors = useColors();
+  const styles = makeStyles(Colors);
   const [categories, setCategories] = useState<Category[]>([]);
   const [existingLimits, setExistingLimits] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -207,7 +209,7 @@ export default function AddLimitScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: 'row',

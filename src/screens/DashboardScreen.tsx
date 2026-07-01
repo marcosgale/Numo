@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { supabase } from '../services/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
@@ -47,6 +47,8 @@ type LimitWithSpent = {
 };
 
 export default function DashboardScreen() {
+  const Colors = useColors();
+  const styles = makeStyles(Colors);
   const navigation = useNavigation<any>();
   const [firstName, setFirstName] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -515,7 +517,7 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   container: { flex: 1 },
   content: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },

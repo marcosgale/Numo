@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -35,6 +35,8 @@ type OnboardingProps = {
 };
 
 export default function OnboardingScreen({ onComplete }: OnboardingProps) {
+  const Colors = useColors();
+  const styles = makeStyles(Colors);
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
@@ -151,7 +153,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: 'row',
