@@ -425,6 +425,15 @@ export default function AddTransactionScreen({ route, navigation }: any) {
             </View>
           )}
 
+          {/* AVISO RECURRENTES */}
+          {isRecurring && (
+            <View style={styles.recurringNotice}>
+              <Text style={styles.recurringNoticeText}>
+                ℹ️  Este gasto se registra ahora como recurrente, pero no se crea automáticamente cada período. Tendrás que añadirlo manualmente cada vez.
+              </Text>
+            </View>
+          )}
+
           {/* CATEGORÍAS */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Categoría (opcional)</Text>
@@ -632,6 +641,15 @@ const makeStyles = (Colors: any) => StyleSheet.create({
   periodLabelActive: { color: Colors.primary },
   periodDesc: { fontSize: FontSize.xs, color: Colors.textSecondary },
   periodDescActive: { color: Colors.primary },
+  recurringNotice: {
+    backgroundColor: Colors.primary + '12',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.primary,
+  },
+  recurringNoticeText: { fontSize: FontSize.xs, color: Colors.textSecondary, lineHeight: 18 },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
   categoryChip: {
     flexDirection: 'row',

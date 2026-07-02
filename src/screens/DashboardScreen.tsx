@@ -356,7 +356,21 @@ export default function DashboardScreen() {
             <View style={styles.emptyCard}>
               <Text style={styles.emptyEmoji}>💸</Text>
               <Text style={styles.emptyText}>Sin movimientos este mes</Text>
-              <Text style={styles.emptySub}>Pulsa + para añadir tu primer gasto</Text>
+              <Text style={styles.emptySub}>Empieza registrando tu primer gasto o ingreso</Text>
+              <View style={styles.emptyActions}>
+                <TouchableOpacity
+                  style={styles.emptyBtn}
+                  onPress={() => navigation.navigate('AddTransaction', { type: 'expense', isRecurring: false })}
+                >
+                  <Text style={styles.emptyBtnText}>+ Gasto</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.emptyBtn, styles.emptyBtnIncome]}
+                  onPress={() => navigation.navigate('AddTransaction', { type: 'income', isRecurring: false })}
+                >
+                  <Text style={[styles.emptyBtnText, styles.emptyBtnIncomeText]}>+ Ingreso</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -453,5 +467,15 @@ const makeStyles = (Colors: any) => StyleSheet.create({
   },
   emptyEmoji: { fontSize: 32, marginBottom: Spacing.sm },
   emptyText: { fontSize: FontSize.md, fontWeight: '600', color: Colors.textPrimary, marginBottom: 4 },
-  emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center' },
+  emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.md },
+  emptyActions: { flexDirection: 'row', gap: Spacing.sm },
+  emptyBtn: {
+    backgroundColor: Colors.negative + '15',
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  emptyBtnIncome: { backgroundColor: Colors.positive + '15' },
+  emptyBtnText: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.negative },
+  emptyBtnIncomeText: { color: Colors.positive },
 });

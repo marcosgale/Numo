@@ -20,8 +20,8 @@ export default function PrivacyScreen({ navigation }: any) {
   const [deletingAccount, setDeletingAccount] = useState(false);
 
   const handleChangePassword = async () => {
-    if (newPassword.length < 6) {
-      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
+    if (newPassword.length < 8) {
+      Alert.alert('Error', 'La contraseña debe tener al menos 8 caracteres');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -63,7 +63,6 @@ export default function PrivacyScreen({ navigation }: any) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setDeletingAccount(false); return; }
 
-    // Borrar todos los datos del usuario
     await supabase.from('group_expenses').delete().eq('paid_by', user.id);
     await supabase.from('group_members').delete().eq('user_id', user.id);
     await supabase.from('limits').delete().eq('user_id', user.id);
@@ -71,7 +70,13 @@ export default function PrivacyScreen({ navigation }: any) {
     await supabase.from('transactions').delete().eq('user_id', user.id);
     await supabase.from('profiles').delete().eq('id', user.id);
 
-    // Cerrar sesión (la entrada en auth.users requiere admin API)
+    const { error } = await supabase.rpc('delete_user');
+    if (error) {
+      Alert.alert('Error', 'No se pudo eliminar la cuenta: ' + error.message);
+      setDeletingAccount(false);
+      return;
+    }
+
     await supabase.auth.signOut();
     setDeletingAccount(false);
   };

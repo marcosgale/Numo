@@ -176,11 +176,14 @@ export default function GroupDetailScreen({ route, navigation }: any) {
       }
     }
 
-    const balances: MemberBalance[] = Object.entries(balanceMap).map(([userId, balance]) => ({
-      userId,
-      name: memberMap[userId] || 'Desconocido',
-      balance: Math.round(balance * 100) / 100,
-    }));
+    const balances: MemberBalance[] = Object.entries(balanceMap).map(([userId, balance]) => {
+      const rounded = Math.round(balance * 100) / 100;
+      return {
+        userId,
+        name: memberMap[userId] || 'Desconocido',
+        balance: Math.abs(rounded) <= 0.01 ? 0 : rounded,
+      };
+    });
     setMemberBalances(balances);
 
     // Simplificar deudas
@@ -466,13 +469,31 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 <View key={index} style={[styles.debtRow, index < debts.length - 1 && styles.border]}>
                   <View style={styles.debtInfo}>
                     <Text style={styles.debtText}>
-                      <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
-                        {debt.from === currentUserId ? 'Tú' : debt.fromName.split(' ')[0]}
-                      </Text>
-                      <Text style={{ color: Colors.textSecondary }}> → </Text>
-                      <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
-                        {debt.to === currentUserId ? 'ti' : debt.toName.split(' ')[0]}
-                      </Text>
+                      {debt.to === currentUserId ? (
+                        <>
+                          <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
+                            {debt.fromName.split(' ')[0]}
+                          </Text>
+                          <Text style={{ color: Colors.textSecondary }}> te paga</Text>
+                        </>
+                      ) : debt.from === currentUserId ? (
+                        <>
+                          <Text style={{ color: Colors.textSecondary }}>Pagas a </Text>
+                          <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
+                            {debt.toName.split(' ')[0]}
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
+                            {debt.fromName.split(' ')[0]}
+                          </Text>
+                          <Text style={{ color: Colors.textSecondary }}> → </Text>
+                          <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
+                            {debt.toName.split(' ')[0]}
+                          </Text>
+                        </>
+                      )}
                     </Text>
                     <Text style={styles.debtAmountSub}>
                       {formatMoney(debt.amount)}{groupCurrencySymbol}

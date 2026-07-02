@@ -75,6 +75,16 @@ export default function NotificationsScreen({ navigation }: any) {
       </View>
 
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoIcon}>🔔</Text>
+          <View style={styles.infoTextWrap}>
+            <Text style={styles.infoTitle}>Próximamente disponible</Text>
+            <Text style={styles.infoText}>
+              Las notificaciones push aún no están activas. Puedes configurar tus preferencias y se aplicarán cuando se activen.
+            </Text>
+          </View>
+        </View>
+
         <Text style={styles.subtitle}>
           Elige qué notificaciones quieres recibir
         </Text>
@@ -94,12 +104,6 @@ export default function NotificationsScreen({ navigation }: any) {
               />
             </View>
           ))}
-        </View>
-
-        <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            Las notificaciones push estarán disponibles próximamente. Tus preferencias se guardarán para cuando estén activas.
-          </Text>
         </View>
 
         <View style={{ height: 40 }} />
@@ -136,9 +140,17 @@ const makeStyles = (Colors: any) => StyleSheet.create({
   rowTitle: { fontSize: FontSize.md, fontWeight: '600', color: Colors.textPrimary, marginBottom: 2 },
   rowDesc: { fontSize: FontSize.xs, color: Colors.textSecondary, lineHeight: 16 },
   infoCard: {
-    backgroundColor: Colors.warning + '15',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: Colors.warning + '20',
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
+    marginBottom: Spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.warning,
   },
-  infoText: { fontSize: FontSize.xs, color: Colors.textSecondary, lineHeight: 18, textAlign: 'center' },
+  infoIcon: { fontSize: 20, marginRight: Spacing.sm },
+  infoTextWrap: { flex: 1 },
+  infoTitle: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.textPrimary, marginBottom: 2 },
+  infoText: { fontSize: FontSize.xs, color: Colors.textSecondary, lineHeight: 18 },
 });
