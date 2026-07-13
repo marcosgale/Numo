@@ -61,7 +61,7 @@ export default function RegisterScreen({ navigation }: any) {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -75,8 +75,28 @@ export default function RegisterScreen({ navigation }: any) {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Error', error.message);
+      const msg = translateAuthError(error.message);
+      Alert.alert('Error al registrarse', msg);
+      return;
     }
+
+    if (!data.session) {
+      Alert.alert(
+        'Revisa tu correo',
+        `Hemos enviado un enlace de confirmación a ${email}. Confírmalo para acceder.`,
+        [{ text: 'Entendido', onPress: () => navigation.goBack() }]
+      );
+    }
+    // Si hay sesión, onAuthStateChange en App.tsx navega automáticamente
+  };
+
+  const translateAuthError = (msg: string): string => {
+    if (msg.includes('already registered') || msg.includes('already been registered')) return 'Ya existe una cuenta con ese email.';
+    if (msg.includes('invalid email') || msg.includes('Invalid email')) return 'El formato del email no es válido.';
+    if (msg.includes('Password should be')) return 'La contraseña debe tener al menos 6 caracteres.';
+    if (msg.includes('rate limit') || msg.includes('too many')) return 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.';
+    if (msg.includes('network') || msg.includes('fetch')) return 'Error de conexión. Comprueba tu internet.';
+    return msg;
   };
 
   return (
