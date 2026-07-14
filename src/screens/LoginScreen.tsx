@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 
 export default function LoginScreen({ navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,22 +17,19 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-
-    if (error) {
-      Alert.alert('Error', error.message);
-    }
+    if (error) Alert.alert(t.common.error, error.message);
   };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView style={styles.safe}>
         <View style={styles.container}>
-          <Text style={styles.title}>Iniciar sesión</Text>
-          <Text style={styles.subtitle}>Bienvenido de vuelta</Text>
+          <Text style={styles.title}>{t.login.title}</Text>
+          <Text style={styles.subtitle}>{t.login.subtitle}</Text>
 
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder={t.login.email}
             placeholderTextColor={Colors.textSecondary}
             value={email}
             onChangeText={setEmail}
@@ -40,7 +39,7 @@ export default function LoginScreen({ navigation }: any) {
 
           <TextInput
             style={styles.input}
-            placeholder="Contraseña"
+            placeholder={t.login.password}
             placeholderTextColor={Colors.textSecondary}
             value={password}
             onChangeText={setPassword}
@@ -52,15 +51,12 @@ export default function LoginScreen({ navigation }: any) {
             onPress={handleLogin}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>{loading ? 'Entrando...' : 'Entrar'}</Text>
+            <Text style={styles.buttonText}>{loading ? t.login.loading : t.login.submit}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => navigation.navigate('Register')}
-          >
+          <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Register')}>
             <Text style={styles.linkText}>
-              ¿No tienes cuenta? <Text style={styles.linkBold}>Crear cuenta</Text>
+              {t.login.noAccount} <Text style={styles.linkBold}>{t.login.createAccount}</Text>
             </Text>
           </TouchableOpacity>
         </View>

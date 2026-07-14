@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Keyboard, TouchableWithoutFeedback, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 
 export default function RegisterScreen({ navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -13,15 +15,12 @@ export default function RegisterScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [titleError, setTitleError] = useState(false);
 
   const validateAge = (dateString: string): boolean => {
     const parts = dateString.split('/');
     if (parts.length !== 3) return false;
-    const birth = new Date(
-      parseInt(parts[2]),
-      parseInt(parts[1]) - 1,
-      parseInt(parts[0])
-    );
+    const birth = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
     if (isNaN(birth.getTime())) return false;
     const today = new Date();
     const age = today.getFullYear() - birth.getFullYear();
@@ -38,138 +37,83 @@ export default function RegisterScreen({ navigation }: any) {
     return `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}/${cleaned.slice(4, 8)}`;
   };
 
+  const translateAuthError = (msg: string): string => {
+    if (msg.includes('already registered') || msg.includes('already been registered')) return t.register.errors.alreadyRegistered;
+    if (msg.includes('invalid email') || msg.includes('Invalid email')) return t.register.errors.invalidEmail;
+    if (msg.includes('Password should be')) return t.register.errors.shortPassword;
+    if (msg.includes('rate limit') || msg.includes('too many')) return t.register.errors.rateLimit;
+    if (msg.includes('network') || msg.includes('fetch')) return t.register.errors.networkError;
+    return msg;
+  };
+
   const handleRegister = async () => {
-    if (!firstName.trim()) {
-      Alert.alert('Error', 'Introduce tu nombre');
-      return;
-    }
-    if (!lastName.trim()) {
-      Alert.alert('Error', 'Introduce tu apellido');
-      return;
-    }
-    if (!validateAge(birthDate)) {
-      Alert.alert('Error', 'Debes tener al menos 16 años para usar Numo');
-      return;
-    }
-    if (!email.trim()) {
-      Alert.alert('Error', 'Introduce tu email');
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
-      return;
-    }
+    if (!firstName.trim()) { Alert.alert(t.common.error, t.register.errors.noName); return; }
+    if (!lastName.trim()) { Alert.alert(t.common.error, t.register.errors.noLastName); return; }
+    if (!validateAge(birthDate)) { Alert.alert(t.common.error, t.register.errors.ageError); return; }
+    if (!email.trim()) { Alert.alert(t.common.error, t.register.errors.noEmail); return; }
+    if (password.length < 6) { Alert.alert(t.common.error, t.register.errors.shortPassword); return; }
 
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          birth_date: birthDate,
-        }
-      }
+      options: { data: { first_name: firstName.trim(), last_name: lastName.trim(), birth_date: birthDate } },
     });
     setLoading(false);
 
     if (error) {
-      const msg = translateAuthError(error.message);
-      Alert.alert('Error al registrarse', msg);
+      Alert.alert(t.register.errors.signUpError, translateAuthError(error.message));
       return;
     }
 
     if (!data.session) {
       Alert.alert(
-        'Revisa tu correo',
-        `Hemos enviado un enlace de confirmación a ${email}. Confírmalo para acceder.`,
-        [{ text: 'Entendido', onPress: () => navigation.goBack() }]
+        t.register.checkEmail,
+        t.register.checkEmailMsg(email),
+        [{ text: t.register.understood, onPress: () => navigation.goBack() }]
       );
     }
-    // Si hay sesión, onAuthStateChange en App.tsx navega automáticamente
-  };
-
-  const translateAuthError = (msg: string): string => {
-    if (msg.includes('already registered') || msg.includes('already been registered')) return 'Ya existe una cuenta con ese email.';
-    if (msg.includes('invalid email') || msg.includes('Invalid email')) return 'El formato del email no es válido.';
-    if (msg.includes('Password should be')) return 'La contraseña debe tener al menos 6 caracteres.';
-    if (msg.includes('rate limit') || msg.includes('too many')) return 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.';
-    if (msg.includes('network') || msg.includes('fetch')) return 'Error de conexión. Comprueba tu internet.';
-    return msg;
   };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView style={styles.safe}>
-        <ScrollView
-          contentContainerStyle={styles.container}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.title}>Crear cuenta</Text>
-          <Text style={styles.subtitle}>Empieza a controlar tus finanzas</Text>
+        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+          <Text style={styles.title}>{t.register.title}</Text>
+          <Text style={styles.subtitle}>{t.register.subtitle}</Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Nombre"
-            placeholderTextColor={Colors.textSecondary}
-            value={firstName}
-            onChangeText={setFirstName}
-            autoCapitalize="words"
-          />
+          <TextInput style={styles.input} placeholder={t.register.firstName}
+            placeholderTextColor={Colors.textSecondary} value={firstName}
+            onChangeText={setFirstName} autoCapitalize="words" />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Apellido"
-            placeholderTextColor={Colors.textSecondary}
-            value={lastName}
-            onChangeText={setLastName}
-            autoCapitalize="words"
-          />
+          <TextInput style={styles.input} placeholder={t.register.lastName}
+            placeholderTextColor={Colors.textSecondary} value={lastName}
+            onChangeText={setLastName} autoCapitalize="words" />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Fecha de nacimiento (DD/MM/YYYY)"
-            placeholderTextColor={Colors.textSecondary}
-            value={birthDate}
+          <TextInput style={styles.input} placeholder={t.register.birthDate}
+            placeholderTextColor={Colors.textSecondary} value={birthDate}
             onChangeText={(text) => setBirthDate(formatBirthDate(text))}
-            keyboardType="numeric"
-            maxLength={10}
-          />
+            keyboardType="numeric" maxLength={10} />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={Colors.textSecondary}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
+          <TextInput style={styles.input} placeholder={t.register.email}
+            placeholderTextColor={Colors.textSecondary} value={email}
+            onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Contraseña (mínimo 6 caracteres)"
-            placeholderTextColor={Colors.textSecondary}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+          <TextInput style={styles.input} placeholder={t.register.password}
+            placeholderTextColor={Colors.textSecondary} value={password}
+            onChangeText={setPassword} secureTextEntry />
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleRegister}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>{loading ? 'Creando...' : 'Registrarme'}</Text>
+            <Text style={styles.buttonText}>{loading ? t.register.loading : t.register.submit}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => navigation.goBack()}
-          >
+          <TouchableOpacity style={styles.linkButton} onPress={() => navigation.goBack()}>
             <Text style={styles.linkText}>
-              ¿Ya tienes cuenta? <Text style={styles.linkBold}>Iniciar sesión</Text>
+              {t.register.hasAccount} <Text style={styles.linkBold}>{t.register.loginLink}</Text>
             </Text>
           </TouchableOpacity>
         </ScrollView>

@@ -6,12 +6,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 
 const EMOJIS = ['🎯', '✈️', '🏠', '🚗', '💻', '📱', '🎓', '💍', '🏖️', '🎮', '🎸', '🏋️', '📚', '🎁', '💰', '🌍'];
 
 export default function AddGoalScreen({ route, navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const goal = route.params?.goal;
   const isEditing = !!goal;
@@ -55,15 +57,15 @@ export default function AddGoalScreen({ route, navigation }: any) {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Dale un nombre a tu meta');
+      Alert.alert(t.common.error, t.addGoal.errors.noName);
       return;
     }
     if (!targetAmount || parseFloat(targetAmount) <= 0) {
-      Alert.alert('Error', 'Introduce una cantidad objetivo');
+      Alert.alert(t.common.error, t.addGoal.errors.noAmount);
       return;
     }
     if (deadline && !parseDeadline(deadline)) {
-      Alert.alert('Error', 'Formato de fecha inválido (DD/MM/YYYY)');
+      Alert.alert(t.common.error, t.addGoal.errors.invalidDate);
       return;
     }
 
@@ -71,7 +73,7 @@ export default function AddGoalScreen({ route, navigation }: any) {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      Alert.alert('Error', 'No hay sesión activa');
+      Alert.alert(t.common.error, t.addGoal.errors.noSession);
       setLoading(false);
       return;
     }
@@ -105,9 +107,9 @@ export default function AddGoalScreen({ route, navigation }: any) {
       Alert.alert('Error', error.message);
     } else {
       Alert.alert(
-        isEditing ? '¡Meta actualizada!' : '¡Meta creada!',
-        isEditing ? '' : 'Ya puedes empezar a ahorrar',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
+        isEditing ? t.addGoal.successUpdate : t.addGoal.successCreate,
+        isEditing ? '' : t.addGoal.successMsg,
+        [{ text: t.common.ok, onPress: () => navigation.goBack() }]
       );
     }
   };
@@ -119,7 +121,7 @@ export default function AddGoalScreen({ route, navigation }: any) {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <ChevronLeft size={28} color={Colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{isEditing ? 'Editar meta' : 'Nueva meta'}</Text>
+          <Text style={styles.headerTitle}>{isEditing ? t.addGoal.editTitle : t.addGoal.title}</Text>
           <View style={{ width: 28 }} />
         </View>
 
@@ -129,10 +131,10 @@ export default function AddGoalScreen({ route, navigation }: any) {
         >
           {/* NOMBRE */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Nombre de la meta</Text>
+            <Text style={styles.sectionLabel}>{t.addGoal.name}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ej: Viaje a Japón, Coche nuevo..."
+              placeholder={t.addGoal.namePlaceholder}
               placeholderTextColor={Colors.textSecondary}
               value={name}
               onChangeText={setName}
@@ -142,10 +144,10 @@ export default function AddGoalScreen({ route, navigation }: any) {
 
           {/* DESCRIPCIÓN */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Descripción (opcional)</Text>
+            <Text style={styles.sectionLabel}>{t.addGoal.description}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Ej: Dos semanas por Tokio, Osaka y Kioto"
+              placeholder={t.addGoal.descriptionPlaceholder}
               placeholderTextColor={Colors.textSecondary}
               value={description}
               onChangeText={setDescription}
@@ -157,7 +159,7 @@ export default function AddGoalScreen({ route, navigation }: any) {
 
           {/* CANTIDAD OBJETIVO */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>¿Cuánto necesitas?</Text>
+            <Text style={styles.sectionLabel}>{t.addGoal.targetAmount}</Text>
             <View style={styles.amountRow}>
               <TextInput
                 style={styles.amountInput}
@@ -173,7 +175,7 @@ export default function AddGoalScreen({ route, navigation }: any) {
 
           {/* EMOJI */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Elige un icono</Text>
+            <Text style={styles.sectionLabel}>{t.addGoal.chooseIcon}</Text>
             <View style={styles.emojiGrid}>
               {EMOJIS.map((e) => (
                 <TouchableOpacity
@@ -189,7 +191,7 @@ export default function AddGoalScreen({ route, navigation }: any) {
 
           {/* FECHA LÍMITE */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Fecha límite (opcional)</Text>
+            <Text style={styles.sectionLabel}>{t.addGoal.deadline}</Text>
             <TextInput
               style={styles.input}
               placeholder="DD/MM/YYYY"
@@ -208,7 +210,7 @@ export default function AddGoalScreen({ route, navigation }: any) {
             disabled={loading}
           >
             <Text style={styles.buttonText}>
-              {loading ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear meta'}
+              {loading ? t.addGoal.saving : isEditing ? t.addGoal.update : t.addGoal.save}
             </Text>
           </TouchableOpacity>
         </ScrollView>

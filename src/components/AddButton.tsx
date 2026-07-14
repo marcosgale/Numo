@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable } from 'react-native';
 import { Plus, X, TrendingDown, TrendingUp, Users, RefreshCw } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 
 type AddButtonProps = {
   visible: boolean;
@@ -10,6 +11,7 @@ type AddButtonProps = {
 
 export default function AddButton({ visible, onClose, onSelectOption }: AddButtonProps) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
 
   const handleSelect = (option: 'expense' | 'income' | 'shared' | 'recurring') => {
@@ -31,7 +33,7 @@ export default function AddButton({ visible, onClose, onSelectOption }: AddButto
           <View style={styles.handle} />
 
           <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Añadir movimiento</Text>
+            <Text style={styles.sheetTitle}>{t.addButton.title}</Text>
             <TouchableOpacity onPress={onClose}>
               <X size={24} color={Colors.textSecondary} />
             </TouchableOpacity>
@@ -45,7 +47,7 @@ export default function AddButton({ visible, onClose, onSelectOption }: AddButto
               <View style={styles.iconCircle}>
                 <TrendingDown size={28} color={Colors.negative} />
               </View>
-              <Text style={styles.gridLabel}>Gasto</Text>
+              <Text style={styles.gridLabel}>{t.addButton.expense}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -55,7 +57,7 @@ export default function AddButton({ visible, onClose, onSelectOption }: AddButto
               <View style={styles.iconCircle}>
                 <TrendingUp size={28} color={Colors.positive} />
               </View>
-              <Text style={styles.gridLabel}>Ingreso</Text>
+              <Text style={styles.gridLabel}>{t.addButton.income}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -65,7 +67,7 @@ export default function AddButton({ visible, onClose, onSelectOption }: AddButto
               <View style={styles.iconCircle}>
                 <Users size={28} color="#9B59B6" />
               </View>
-              <Text style={styles.gridLabel}>Gasto compartido</Text>
+              <Text style={styles.gridLabel}>{t.addButton.shared}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -75,7 +77,7 @@ export default function AddButton({ visible, onClose, onSelectOption }: AddButto
               <View style={styles.iconCircle}>
                 <RefreshCw size={28} color="#3498DB" />
               </View>
-              <Text style={styles.gridLabel}>Gasto recurrente</Text>
+              <Text style={styles.gridLabel}>{t.addButton.recurring}</Text>
             </TouchableOpacity>
           </View>
         </Pressable>

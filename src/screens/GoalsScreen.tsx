@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, Trash2 } from 'lucide-react-native';
 import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
@@ -57,6 +58,7 @@ function CircularProgress({
 
 export default function GoalsScreen() {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const navigation = useNavigation<any>();
 
@@ -137,10 +139,10 @@ export default function GoalsScreen() {
     const diff = Math.ceil(
       (new Date(deadline + 'T00:00:00').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
     );
-    if (diff < 0) return 'Vencida';
-    if (diff === 0) return 'Hoy';
-    if (diff === 1) return '1 día';
-    return `${diff} días`;
+    if (diff < 0) return t.goals.expired;
+    if (diff === 0) return t.common.today;
+    if (diff === 1) return `1 ${t.goals.day}`;
+    return `${diff} ${t.goals.days}`;
   };
 
   const getGoalColor = (progress: number) => {
@@ -157,19 +159,19 @@ export default function GoalsScreen() {
   };
 
   const getPeriodLabel = (period: string) => {
-    if (period === 'daily') return 'Diario';
-    if (period === 'weekly') return 'Semanal';
-    return 'Mensual';
+    if (period === 'daily') return t.goals.periods.daily;
+    if (period === 'weekly') return t.goals.periods.weekly;
+    return t.goals.periods.monthly;
   };
 
   const handleDeleteLimit = (limitId: string, categoryName: string) => {
     Alert.alert(
-      'Eliminar límite',
-      `¿Eliminar el límite de ${categoryName}?`,
+      t.goals.deleteLimit,
+      t.goals.deleteLimitMsg(categoryName),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Eliminar', style: 'destructive',
+          text: t.common.delete, style: 'destructive',
           onPress: async () => {
             await supabase.from('limits').delete().eq('id', limitId);
             setLimits(prev => prev.filter(l => l.id !== limitId));
@@ -184,7 +186,7 @@ export default function GoalsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Planifica</Text>
+        <Text style={styles.headerTitle}>{t.goals.title}</Text>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => navigation.navigate(tab === 'goals' ? 'AddGoal' : 'AddLimit')}
@@ -194,14 +196,14 @@ export default function GoalsScreen() {
       </View>
 
       <View style={styles.tabsBar}>
-        {(['goals', 'limits'] as const).map(t => (
+        {(['goals', 'limits'] as const).map(tabKey => (
           <TouchableOpacity
-            key={t}
-            style={[styles.tabItem, tab === t && styles.tabItemActive]}
-            onPress={() => setTab(t)}
+            key={tabKey}
+            style={[styles.tabItem, tab === tabKey && styles.tabItemActive]}
+            onPress={() => setTab(tabKey)}
           >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'goals' ? 'Metas' : 'Límites'}
+            <Text style={[styles.tabText, tab === tabKey && styles.tabTextActive]}>
+              {tabKey === 'goals' ? t.goals.goalsTab : t.goals.limitsTab}
             </Text>
           </TouchableOpacity>
         ))}
@@ -224,21 +226,21 @@ export default function GoalsScreen() {
                       <Text style={styles.summaryValue}>
                         {goals.filter(g => getProgress(g.current_amount, g.target_amount) < 100).length}
                       </Text>
-                      <Text style={styles.summaryLabel}>Activas</Text>
+                      <Text style={styles.summaryLabel}>{t.goals.active}</Text>
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryItem}>
                       <Text style={[styles.summaryValue, { color: Colors.positive }]}>
                         {goals.filter(g => getProgress(g.current_amount, g.target_amount) >= 100).length}
                       </Text>
-                      <Text style={styles.summaryLabel}>Completadas</Text>
+                      <Text style={styles.summaryLabel}>{t.goals.completed}</Text>
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryItem}>
                       <Text style={[styles.summaryValue, { color: Colors.primary }]}>
                         {formatMoney(goals.reduce((sum, g) => sum + Number(g.current_amount), 0))}€
                       </Text>
-                      <Text style={styles.summaryLabel}>Ahorrado</Text>
+                      <Text style={styles.summaryLabel}>{t.goals.totalSaved}</Text>
                     </View>
                   </View>
                 </View>
@@ -268,15 +270,15 @@ export default function GoalsScreen() {
                             {goal.emoji || '🎯'} {goal.name}
                           </Text>
                           {daysLeft && (
-                            <Text style={[styles.goalDeadline, daysLeft === 'Vencida' && { color: Colors.negative }]}>
-                              {daysLeft === 'Vencida' ? '⚠️ Vencida' : `⏳ ${daysLeft} restantes`}
+                            <Text style={[styles.goalDeadline, daysLeft === t.goals.expired && { color: Colors.negative }]}>
+                              {daysLeft === t.goals.expired ? `⚠️ ${t.goals.expired}` : `⏳ ${daysLeft} ${t.goals.remaining}`}
                             </Text>
                           )}
                           <View style={styles.goalAmounts}>
                             <Text style={[styles.goalSaved, { color }]}>
                               {formatMoney(Number(goal.current_amount))}€
                             </Text>
-                            <Text style={styles.goalOf}> de {formatMoney(Number(goal.target_amount))}€</Text>
+                            <Text style={styles.goalOf}> {t.common.of} {formatMoney(Number(goal.target_amount))}€</Text>
                           </View>
                         </View>
                       </View>
@@ -287,10 +289,10 @@ export default function GoalsScreen() {
             ) : (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyEmoji}>🎯</Text>
-                <Text style={styles.emptyTitle}>Crea tu primera meta</Text>
-                <Text style={styles.emptySub}>Establece objetivos de ahorro y sigue tu progreso</Text>
+                <Text style={styles.emptyTitle}>{t.goals.emptyGoalTitle}</Text>
+                <Text style={styles.emptySub}>{t.goals.emptyGoalSub}</Text>
                 <TouchableOpacity style={styles.emptyButton} onPress={() => navigation.navigate('AddGoal')}>
-                  <Text style={styles.emptyButtonText}>Crear meta</Text>
+                  <Text style={styles.emptyButtonText}>{t.goals.createGoal}</Text>
                 </TouchableOpacity>
               </View>
             )
@@ -328,19 +330,19 @@ export default function GoalsScreen() {
                       <Text style={[styles.limitSpent, isOver && { color: Colors.negative }]}>
                         {formatMoney(catSpent)}€
                       </Text>
-                      <Text style={styles.limitTotal}>de {formatMoney(Number(limit.amount))}€</Text>
+                      <Text style={styles.limitTotal}>{t.goals.of} {formatMoney(Number(limit.amount))}€</Text>
                     </View>
 
                     {isOver && (
                       <View style={styles.overBadge}>
                         <Text style={styles.overText}>
-                          ⚠️ Superado por {formatMoney(catSpent - Number(limit.amount))}€
+                          {t.goals.exceeded(formatMoney(catSpent - Number(limit.amount)))}
                         </Text>
                       </View>
                     )}
                     {pct >= 80 && !isOver && (
                       <View style={styles.warningBadge}>
-                        <Text style={styles.warningText}>⚡ Llevas el {Math.round(pct)}% del límite</Text>
+                        <Text style={styles.warningText}>{t.goals.nearLimit(String(Math.round(pct)))}</Text>
                       </View>
                     )}
                   </View>
@@ -349,10 +351,10 @@ export default function GoalsScreen() {
             ) : (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyEmoji}>📊</Text>
-                <Text style={styles.emptyTitle}>Sin límites configurados</Text>
-                <Text style={styles.emptySub}>Establece topes de gasto por categoría para controlar mejor tu dinero</Text>
+                <Text style={styles.emptyTitle}>{t.goals.emptyLimitTitle}</Text>
+                <Text style={styles.emptySub}>{t.goals.emptyLimitSub}</Text>
                 <TouchableOpacity style={styles.emptyButton} onPress={() => navigation.navigate('AddLimit')}>
-                  <Text style={styles.emptyButtonText}>Crear límite</Text>
+                  <Text style={styles.emptyButtonText}>{t.goals.createLimit}</Text>
                 </TouchableOpacity>
               </View>
             )

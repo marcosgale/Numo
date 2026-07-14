@@ -7,6 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 
 const CURRENCIES = [
@@ -36,6 +37,7 @@ type ExpenseSplit = {
 
 export default function AddGroupExpenseScreen({ route, navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const { groupId, members: rawMembers, expense, groupCurrency } = route.params;
 
@@ -179,7 +181,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
 
   const handleSave = async () => {
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Error', 'Introduce un importe válido');
+      Alert.alert(t.common.error, t.addGroupExpense.errors.invalidAmount);
       return;
     }
     if (!description.trim()) {
@@ -187,18 +189,18 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
       return;
     }
     if (!paidBy) {
-      Alert.alert('Error', 'Selecciona quién ha pagado');
+      Alert.alert(t.common.error, t.addGroupExpense.errors.noPayer);
       return;
     }
     if (selectedMembers.length < 2) {
-      Alert.alert('Error', 'Selecciona al menos 2 participantes');
+      Alert.alert(t.common.error, t.addGroupExpense.errors.minParticipants);
       return;
     }
     if (!splitEqually) {
       const total = selectedMembers.reduce((sum, uid) => sum + (parseFloat(customSplits[uid] || '0')), 0);
       const diff = Math.abs(total - parseFloat(amount));
       if (diff > 0.02) {
-        Alert.alert('Error', `Los importes no suman el total. Diferencia: ${diff.toFixed(2)}`);
+        Alert.alert(t.common.error, t.addGroupExpense.errors.splitMismatch(diff.toFixed(2)));
         return;
       }
     }
@@ -225,7 +227,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
 
       if (updateError) {
         setLoading(false);
-        Alert.alert('Error', updateError.message);
+        Alert.alert(t.common.error, updateError.message);
         return;
       }
 
@@ -240,7 +242,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
 
       const { error: splitError } = await supabase.from('group_expense_splits').insert(splits);
       setLoading(false);
-      if (splitError) Alert.alert('Error', splitError.message);
+      if (splitError) Alert.alert(t.common.error, splitError.message);
       else navigation.goBack();
     } else {
       const { data: newExpense, error: expenseError } = await supabase
@@ -259,7 +261,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
 
       if (expenseError || !newExpense) {
         setLoading(false);
-        Alert.alert('Error', expenseError?.message || 'Error al crear el gasto');
+        Alert.alert(t.common.error, expenseError?.message || t.common.error);
         return;
       }
 
@@ -272,7 +274,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
 
       const { error: splitError } = await supabase.from('group_expense_splits').insert(splits);
       setLoading(false);
-      if (splitError) Alert.alert('Error', splitError.message);
+      if (splitError) Alert.alert(t.common.error, splitError.message);
       else navigation.goBack();
     }
   };
@@ -292,7 +294,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
             <ChevronLeft size={28} color={Colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
-            {isEditMode ? 'Editar gasto' : 'Nuevo gasto compartido'}
+            {isEditMode ? t.addGroupExpense.editTitle : t.addGroupExpense.title}
           </Text>
           <View style={{ width: 28 }} />
         </View>
@@ -306,11 +308,11 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
           {/* TÍTULO */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>
-              Título <Text style={{ color: Colors.negative }}>*</Text>
+              {t.addGroupExpense.descriptionLabel} <Text style={{ color: Colors.negative }}>*</Text>
             </Text>
             <TextInput
               style={[styles.input, titleError && styles.inputError]}
-              placeholder="Ej: Cena, supermercado, Airbnb..."
+              placeholder={t.addGroupExpense.descriptionPlaceholder}
               placeholderTextColor={Colors.textSecondary}
               value={description}
               onChangeText={(text) => {
@@ -319,13 +321,13 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
               }}
             />
             {titleError && (
-              <Text style={styles.errorText}>El título es obligatorio</Text>
+              <Text style={styles.errorText}>{t.addGroupExpense.descriptionRequired}</Text>
             )}
           </View>
 
           {/* IMPORTE + MONEDA */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Importe</Text>
+            <Text style={styles.sectionLabel}>{t.addGroupExpense.amount}</Text>
             <View style={styles.amountRow}>
               <TextInput
                 style={styles.amountInput}
@@ -345,7 +347,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
                   <ActivityIndicator size="small" color={Colors.primary} />
                 ) : baseAmount != null ? (
                   <Text style={styles.conversionText}>
-                    ≈ {formatMoney(baseAmount)}{groupSymbol} (se usa para los balances)
+                    {t.addGroupExpense.conversionNote(formatMoney(baseAmount), groupSymbol)}
                   </Text>
                 ) : null}
               </View>
@@ -376,11 +378,11 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
 
           {/* QUIÉN HA PAGADO */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>¿Quién ha pagado?</Text>
+            <Text style={styles.sectionLabel}>{t.addGroupExpense.whoPaid}</Text>
             <View style={styles.payerRow}>
               {members.map(m => {
                 const isSelected = paidBy === m.user_id;
-                const displayName = m.user_id === currentUserId ? 'Tú' : m.first_name;
+                const displayName = m.user_id === currentUserId ? t.groupDetail.you : m.first_name;
                 return (
                   <TouchableOpacity
                     key={m.user_id}
@@ -404,7 +406,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
 
           {/* FECHA */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Fecha</Text>
+            <Text style={styles.sectionLabel}>{t.addGroupExpense.date}</Text>
             <TextInput
               style={styles.input}
               placeholder="DD/MM/AAAA"
@@ -418,7 +420,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
 
           {/* MÉTODO DE DIVISIÓN */}
           <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Dividir a partes iguales</Text>
+            <Text style={styles.switchLabel}>{t.addGroupExpense.splitEqually}</Text>
             <Switch
               value={splitEqually}
               onValueChange={setSplitEqually}
@@ -429,12 +431,12 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
 
           {/* PARTICIPANTES */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Participantes</Text>
+            <Text style={styles.sectionLabel}>{t.addGroupExpense.participants}</Text>
             <View style={styles.card}>
               {members.map((m, index) => {
                 const isSelected = selectedMembers.includes(m.user_id);
                 const displayName = m.user_id === currentUserId
-                  ? 'Tú'
+                  ? t.groupDetail.you
                   : `${m.first_name} ${m.last_name}`.trim();
 
                 return (
@@ -486,7 +488,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
             disabled={loading || converting}
           >
             <Text style={styles.buttonText}>
-              {loading ? 'Guardando...' : converting ? 'Convirtiendo...' : isEditMode ? 'Guardar cambios' : 'Añadir gasto'}
+              {loading ? t.addGroupExpense.saving : converting ? t.addGroupExpense.converting : isEditMode ? t.addGroupExpense.update : t.addGroupExpense.save}
             </Text>
           </TouchableOpacity>
 

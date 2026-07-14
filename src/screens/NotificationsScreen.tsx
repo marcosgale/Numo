@@ -5,6 +5,7 @@ import { TouchableOpacity } from 'react-native';
 import { ChevronLeft } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const PREFS_KEY = 'notification_prefs';
 
@@ -22,31 +23,11 @@ const DEFAULT_PREFS: Prefs = {
   groupExpenses: true,
 };
 
-const OPTIONS = [
-  {
-    key: 'dailySummary' as keyof Prefs,
-    title: 'Resumen diario',
-    description: 'Recibe un resumen de tus gastos e ingresos cada día',
-  },
-  {
-    key: 'limitAlerts' as keyof Prefs,
-    title: 'Alertas de límites',
-    description: 'Aviso cuando te acerques al 80% de un límite de gasto',
-  },
-  {
-    key: 'goalReminders' as keyof Prefs,
-    title: 'Recordatorios de metas',
-    description: 'Notificación cuando una meta esté próxima a vencer',
-  },
-  {
-    key: 'groupExpenses' as keyof Prefs,
-    title: 'Gastos en grupos',
-    description: 'Aviso cuando alguien añada un gasto en un grupo compartido',
-  },
-];
+const PREF_KEYS: (keyof Prefs)[] = ['dailySummary', 'limitAlerts', 'goalReminders', 'groupExpenses'];
 
 export default function NotificationsScreen({ navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
 
@@ -70,7 +51,7 @@ export default function NotificationsScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ChevronLeft size={28} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notificaciones</Text>
+        <Text style={styles.headerTitle}>{t.notifications.title}</Text>
         <View style={{ width: 28 }} />
       </View>
 
@@ -78,32 +59,31 @@ export default function NotificationsScreen({ navigation }: any) {
         <View style={styles.infoCard}>
           <Text style={styles.infoIcon}>🔔</Text>
           <View style={styles.infoTextWrap}>
-            <Text style={styles.infoTitle}>Próximamente disponible</Text>
-            <Text style={styles.infoText}>
-              Las notificaciones push aún no están activas. Puedes configurar tus preferencias y se aplicarán cuando se activen.
-            </Text>
+            <Text style={styles.infoTitle}>{t.notifications.comingSoon}</Text>
+            <Text style={styles.infoText}>{t.notifications.comingSoonDesc}</Text>
           </View>
         </View>
 
-        <Text style={styles.subtitle}>
-          Elige qué notificaciones quieres recibir
-        </Text>
+        <Text style={styles.subtitle}>{t.notifications.chooseTitle}</Text>
 
         <View style={styles.card}>
-          {OPTIONS.map((opt, i) => (
-            <View key={opt.key} style={[styles.row, i > 0 && styles.rowBorder]}>
-              <View style={styles.rowText}>
-                <Text style={styles.rowTitle}>{opt.title}</Text>
-                <Text style={styles.rowDesc}>{opt.description}</Text>
+          {PREF_KEYS.map((key, i) => {
+            const opt = t.notifications.options[i];
+            return (
+              <View key={key} style={[styles.row, i > 0 && styles.rowBorder]}>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowTitle}>{opt.title}</Text>
+                  <Text style={styles.rowDesc}>{opt.description}</Text>
+                </View>
+                <Switch
+                  value={prefs[key]}
+                  onValueChange={() => toggle(key)}
+                  trackColor={{ false: Colors.border, true: Colors.primary + '80' }}
+                  thumbColor={prefs[key] ? Colors.primary : Colors.textMuted}
+                />
               </View>
-              <Switch
-                value={prefs[opt.key]}
-                onValueChange={() => toggle(opt.key)}
-                trackColor={{ false: Colors.border, true: Colors.primary + '80' }}
-                thumbColor={prefs[opt.key] ? Colors.primary : Colors.textMuted}
-              />
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         <View style={{ height: 40 }} />

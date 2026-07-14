@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 import { TextInput } from 'react-native';
 
@@ -16,15 +17,11 @@ type Category = {
   color: string;
 };
 
-const PERIODS = [
-  { value: 'daily', label: 'Diario', description: 'Límite por día' },
-  { value: 'weekly', label: 'Semanal', description: 'Límite por semana' },
-  { value: 'monthly', label: 'Mensual', description: 'Límite por mes' },
-];
-
 export default function AddLimitScreen({ navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
+  const PERIODS = t.addLimit.periods;
   const [categories, setCategories] = useState<Category[]>([]);
   const [existingLimits, setExistingLimits] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -69,11 +66,11 @@ export default function AddLimitScreen({ navigation }: any) {
 
   const handleSave = async () => {
     if (!selectedCategory) {
-      Alert.alert('Error', 'Selecciona una categoría');
+      Alert.alert(t.common.error, t.addLimit.errors.noCategory);
       return;
     }
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Error', 'Introduce un importe válido');
+      Alert.alert(t.common.error, t.addLimit.errors.invalidAmount);
       return;
     }
 
@@ -97,8 +94,8 @@ export default function AddLimitScreen({ navigation }: any) {
     if (error) {
       Alert.alert('Error', error.message);
     } else {
-      Alert.alert('¡Límite creado!', 'Te avisaremos cuando te acerques', [
-        { text: 'OK', onPress: () => navigation.goBack() },
+      Alert.alert(t.addLimit.successTitle, t.addLimit.successMsg, [
+        { text: t.common.ok, onPress: () => navigation.goBack() },
       ]);
     }
   };
@@ -111,7 +108,7 @@ export default function AddLimitScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ChevronLeft size={28} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Nuevo límite</Text>
+        <Text style={styles.headerTitle}>{t.addLimit.title}</Text>
         <View style={{ width: 28 }} />
       </View>
 
@@ -121,7 +118,7 @@ export default function AddLimitScreen({ navigation }: any) {
       >
         {/* CATEGORÍA */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>¿Qué categoría quieres limitar?</Text>
+          <Text style={styles.sectionLabel}>{t.addLimit.categoryLabel}</Text>
           {availableCategories.length > 0 ? (
             <View style={styles.categoryGrid}>
               {availableCategories.map((cat) => (
@@ -144,13 +141,13 @@ export default function AddLimitScreen({ navigation }: any) {
               ))}
             </View>
           ) : (
-            <Text style={styles.noCats}>Todas tus categorías ya tienen límite</Text>
+            <Text style={styles.noCats}>{t.addLimit.noCats}</Text>
           )}
         </View>
 
         {/* IMPORTE */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>¿Cuánto como máximo?</Text>
+          <Text style={styles.sectionLabel}>{t.addLimit.amountLabel}</Text>
           <View style={styles.amountRow}>
             <TextInput
               style={styles.amountInput}
@@ -166,7 +163,7 @@ export default function AddLimitScreen({ navigation }: any) {
 
         {/* PERIODO */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>¿Cada cuánto se reinicia?</Text>
+          <Text style={styles.sectionLabel}>{t.addLimit.periodLabel}</Text>
           <View style={styles.periodRow}>
             {PERIODS.map((p) => (
               <TouchableOpacity
@@ -201,7 +198,7 @@ export default function AddLimitScreen({ navigation }: any) {
           disabled={loading || !selectedCategory}
         >
           <Text style={styles.buttonText}>
-            {loading ? 'Guardando...' : 'Crear límite'}
+            {loading ? t.addLimit.saving : t.addLimit.save}
           </Text>
         </TouchableOpacity>
       </ScrollView>

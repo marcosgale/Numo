@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
@@ -39,6 +40,7 @@ type LimitWithSpent = {
 
 export default function DashboardScreen() {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const navigation = useNavigation<any>();
 
@@ -53,9 +55,9 @@ export default function DashboardScreen() {
 
   const getGreeting = () => {
     const h = new Date().getHours();
-    if (h < 12) return 'Buenos días,';
-    if (h < 20) return 'Buenas tardes,';
-    return 'Buenas noches,';
+    if (h < 12) return t.dashboard.greeting.morning;
+    if (h < 20) return t.dashboard.greeting.afternoon;
+    return t.dashboard.greeting.evening;
   };
 
   const fetchData = async () => {
@@ -157,9 +159,9 @@ export default function DashboardScreen() {
     const date = new Date(d + 'T00:00:00');
     const today = new Date();
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-    if (date.toDateString() === today.toDateString()) return 'Hoy';
-    if (date.toDateString() === yesterday.toDateString()) return 'Ayer';
-    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    if (date.toDateString() === today.toDateString()) return t.common.today;
+    if (date.toDateString() === yesterday.toDateString()) return t.common.yesterday;
+    return date.toLocaleDateString(t.dashboard.locale, { day: 'numeric', month: 'short' });
   };
 
   const getLimitColor = (pct: number) => {
@@ -182,7 +184,7 @@ export default function DashboardScreen() {
   }
 
   const available = monthIncome - monthExpenses - monthSavings;
-  const monthLabel = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  const monthLabel = new Date().toLocaleDateString(t.dashboard.locale, { month: 'long', year: 'numeric' });
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -200,46 +202,36 @@ export default function DashboardScreen() {
           <Text style={[styles.balanceAmount, { color: available >= 0 ? '#fff' : '#FF6B6B' }]}>
             {available >= 0 ? '' : '-'}{formatMoney(Math.abs(available))} €
           </Text>
-          <Text style={styles.balanceLabel}>disponible</Text>
+          <Text style={styles.balanceLabel}>{t.dashboard.available}</Text>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statPill}>
-              <Text style={styles.statArrow}>↑</Text>
-              <View>
-                <Text style={styles.statLabel}>Ingresos</Text>
-                <Text style={styles.statPos}>+{formatMoney(monthIncome)}€</Text>
-              </View>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statPill}>
-              <Text style={styles.statArrowNeg}>↓</Text>
-              <View>
-                <Text style={styles.statLabel}>Gastos</Text>
-                <Text style={styles.statNeg}>-{formatMoney(monthExpenses)}€</Text>
-              </View>
-            </View>
-            {monthSavings > 0 && (
-              <>
-                <View style={styles.statDivider} />
-                <View style={styles.statPill}>
-                  <Text style={{ fontSize: 14 }}>🐷</Text>
-                  <View>
-                    <Text style={styles.statLabel}>Ahorrado</Text>
-                    <Text style={styles.statSav}>{formatMoney(monthSavings)}€</Text>
-                  </View>
-                </View>
-              </>
-            )}
+          <View style={styles.statsDivider} />
+
+          <View style={styles.statRow}>
+            <View style={[styles.statDot, { backgroundColor: '#30D158' }]} />
+            <Text style={styles.statLabel}>{t.dashboard.income}</Text>
+            <Text style={styles.statPos}>+{formatMoney(monthIncome)} €</Text>
           </View>
+          <View style={styles.statRow}>
+            <View style={[styles.statDot, { backgroundColor: '#FF453A' }]} />
+            <Text style={styles.statLabel}>{t.dashboard.expenses}</Text>
+            <Text style={styles.statNeg}>-{formatMoney(monthExpenses)} €</Text>
+          </View>
+          {monthSavings > 0 && (
+            <View style={styles.statRow}>
+              <View style={[styles.statDot, { backgroundColor: '#FFD60A' }]} />
+              <Text style={styles.statLabel}>{t.dashboard.saved}</Text>
+              <Text style={styles.statSav}>{formatMoney(monthSavings)} €</Text>
+            </View>
+          )}
         </View>
 
         {/* LÍMITES */}
         {limits.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Límites</Text>
+              <Text style={styles.sectionTitle}>{t.dashboard.limits}</Text>
               <TouchableOpacity onPress={() => navigation.navigate('Limits')}>
-                <Text style={styles.sectionLink}>Ver todos</Text>
+                <Text style={styles.sectionLink}>{t.dashboard.viewAll}</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.card}>
@@ -274,9 +266,9 @@ export default function DashboardScreen() {
         {goals.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Metas</Text>
+              <Text style={styles.sectionTitle}>{t.dashboard.goals}</Text>
               <TouchableOpacity onPress={() => navigation.navigate('Planifica')}>
-                <Text style={styles.sectionLink}>Ver todas</Text>
+                <Text style={styles.sectionLink}>{t.dashboard.viewAllF}</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.card}>
@@ -311,9 +303,9 @@ export default function DashboardScreen() {
         {/* ÚLTIMOS MOVIMIENTOS */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Últimos movimientos</Text>
+            <Text style={styles.sectionTitle}>{t.dashboard.recentTransactions}</Text>
             <TouchableOpacity onPress={() => navigation.navigate('History')}>
-              <Text style={styles.sectionLink}>Ver todos</Text>
+              <Text style={styles.sectionLink}>{t.dashboard.viewAll}</Text>
             </TouchableOpacity>
           </View>
           {transactions.length > 0 ? (
@@ -338,7 +330,7 @@ export default function DashboardScreen() {
                     </View>
                     <View style={styles.txInfo}>
                       <Text style={styles.txName} numberOfLines={1}>
-                        {tx.description || tx.categories?.name || 'Sin concepto'}
+                        {tx.description || tx.categories?.name || t.dashboard.noConcept}
                       </Text>
                       <Text style={styles.txDate}>{formatDate(tx.date)}</Text>
                     </View>
@@ -355,20 +347,20 @@ export default function DashboardScreen() {
           ) : (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyEmoji}>💸</Text>
-              <Text style={styles.emptyText}>Sin movimientos este mes</Text>
-              <Text style={styles.emptySub}>Empieza registrando tu primer gasto o ingreso</Text>
+              <Text style={styles.emptyText}>{t.dashboard.noMovements}</Text>
+              <Text style={styles.emptySub}>{t.dashboard.noMovementsSub}</Text>
               <View style={styles.emptyActions}>
                 <TouchableOpacity
                   style={styles.emptyBtn}
                   onPress={() => navigation.navigate('AddTransaction', { type: 'expense', isRecurring: false })}
                 >
-                  <Text style={styles.emptyBtnText}>+ Gasto</Text>
+                  <Text style={styles.emptyBtnText}>{t.dashboard.addExpense}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.emptyBtn, styles.emptyBtnIncome]}
                   onPress={() => navigation.navigate('AddTransaction', { type: 'income', isRecurring: false })}
                 >
-                  <Text style={[styles.emptyBtnText, styles.emptyBtnIncomeText]}>+ Ingreso</Text>
+                  <Text style={[styles.emptyBtnText, styles.emptyBtnIncomeText]}>{t.dashboard.addIncome}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -410,21 +402,25 @@ const makeStyles = (Colors: any) => StyleSheet.create({
   balanceLabel: {
     fontSize: FontSize.sm,
     color: 'rgba(255,255,255,0.5)',
-    marginBottom: Spacing.lg,
+    marginBottom: 0,
   },
-  statsRow: {
+  statsDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginVertical: Spacing.md,
+  },
+  statRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    paddingVertical: 5,
   },
-  statPill: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.12)', marginHorizontal: 4 },
-  statArrow: { fontSize: 16, color: '#30D158', fontWeight: '700' },
-  statArrowNeg: { fontSize: 16, color: '#FF453A', fontWeight: '700' },
-  statLabel: { fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 1 },
+  statDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: Spacing.sm,
+  },
+  statLabel: { flex: 1, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.55)' },
   statPos: { fontSize: FontSize.sm, fontWeight: '700', color: '#30D158' },
   statNeg: { fontSize: FontSize.sm, fontWeight: '700', color: '#FF453A' },
   statSav: { fontSize: FontSize.sm, fontWeight: '700', color: '#FFD60A' },

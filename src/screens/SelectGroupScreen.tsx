@@ -5,6 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 
 type Group = {
@@ -17,6 +18,7 @@ type Group = {
 
 export default function SelectGroupScreen({ navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +79,7 @@ export default function SelectGroupScreen({ navigation }: any) {
     setSelecting(null);
 
     if (!membersData) {
-      Alert.alert('Error', 'No se pudieron cargar los miembros del grupo');
+      Alert.alert(t.common.error, t.selectGroup.loadError);
       return;
     }
 
@@ -87,7 +89,6 @@ export default function SelectGroupScreen({ navigation }: any) {
       last_name: m.profiles?.last_name || '',
     }));
 
-    // replace para que al guardar el gasto vuelva directamente a MainTabs
     navigation.replace('AddGroupExpense', {
       groupId: group.id,
       members,
@@ -101,7 +102,7 @@ export default function SelectGroupScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ChevronLeft size={28} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>¿En qué grupo?</Text>
+        <Text style={styles.headerTitle}>{t.selectGroup.title}</Text>
         <View style={{ width: 28 }} />
       </View>
 
@@ -112,17 +113,15 @@ export default function SelectGroupScreen({ navigation }: any) {
       ) : groups.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.emptyEmoji}>👥</Text>
-          <Text style={styles.emptyTitle}>No tienes ningún grupo</Text>
-          <Text style={styles.emptySub}>
-            Crea o únete a un grupo desde la pestaña Grupos para poder añadir gastos compartidos
-          </Text>
+          <Text style={styles.emptyTitle}>{t.selectGroup.noGroups}</Text>
+          <Text style={styles.emptySub}>{t.selectGroup.noGroupsSub}</Text>
         </View>
       ) : (
         <ScrollView
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.subtitle}>Selecciona el grupo donde añadir el gasto</Text>
+          <Text style={styles.subtitle}>{t.selectGroup.subtitle}</Text>
           {groups.map(group => (
             <TouchableOpacity
               key={group.id}
@@ -135,7 +134,7 @@ export default function SelectGroupScreen({ navigation }: any) {
               <View style={styles.groupInfo}>
                 <Text style={styles.groupName}>{group.name}</Text>
                 <Text style={styles.groupMeta}>
-                  {group.memberCount} {group.memberCount === 1 ? 'miembro' : 'miembros'} · {group.currency}
+                  {group.memberCount} {group.memberCount === 1 ? t.groups.member : t.groups.members} · {group.currency}
                 </Text>
               </View>
               {selecting === group.id ? (

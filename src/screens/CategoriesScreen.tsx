@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 
 type Category = {
@@ -32,6 +33,7 @@ const EMOJIS = [
 
 export default function CategoriesScreen({ navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -39,7 +41,6 @@ export default function CategoriesScreen({ navigation }: any) {
   const [tab, setTab] = useState<'expense' | 'income'>('expense');
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Form state
   const [newName, setNewName] = useState('');
   const [newIcon, setNewIcon] = useState('🛒');
   const [newColor, setNewColor] = useState('#1DB87A');
@@ -68,7 +69,7 @@ export default function CategoriesScreen({ navigation }: any) {
 
   const handleCreate = async () => {
     if (!newName.trim()) {
-      Alert.alert('Error', 'Dale un nombre a la categoría');
+      Alert.alert(t.common.error, t.categories.errors.noName);
       return;
     }
 
@@ -87,7 +88,7 @@ export default function CategoriesScreen({ navigation }: any) {
     setSaving(false);
 
     if (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert(t.common.error, error.message);
     } else {
       setCategories(prev => [...prev, data as Category]);
       setModalVisible(false);
@@ -99,16 +100,16 @@ export default function CategoriesScreen({ navigation }: any) {
 
   const handleDelete = (cat: Category) => {
     if (!cat.user_id) {
-      Alert.alert('No se puede eliminar', 'Las categorías predefinidas no se pueden eliminar');
+      Alert.alert(t.categories.cannotDelete, t.categories.cannotDeleteMsg);
       return;
     }
     Alert.alert(
-      'Eliminar categoría',
-      `¿Eliminar "${cat.name}"? Las transacciones asociadas no se borrarán.`,
+      t.categories.deleteTitle,
+      t.categories.deleteMsg(cat.name),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Eliminar',
+          text: t.common.delete,
           style: 'destructive',
           onPress: async () => {
             await supabase.from('categories').delete().eq('id', cat.id);
@@ -127,7 +128,7 @@ export default function CategoriesScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ChevronLeft size={28} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Categorías</Text>
+        <Text style={styles.headerTitle}>{t.categories.title}</Text>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => { setNewType(tab); setModalVisible(true); }}
@@ -136,16 +137,15 @@ export default function CategoriesScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* TABS */}
       <View style={styles.tabsBar}>
-        {(['expense', 'income'] as const).map(t => (
+        {(['expense', 'income'] as const).map(type => (
           <TouchableOpacity
-            key={t}
-            style={[styles.tab, tab === t && styles.tabActive]}
-            onPress={() => setTab(t)}
+            key={type}
+            style={[styles.tab, tab === type && styles.tabActive]}
+            onPress={() => setTab(type)}
           >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'expense' ? 'Gastos' : 'Ingresos'}
+            <Text style={[styles.tabText, tab === type && styles.tabTextActive]}>
+              {type === 'expense' ? t.categories.expenseTab : t.categories.incomeTab}
             </Text>
           </TouchableOpacity>
         ))}
@@ -160,8 +160,8 @@ export default function CategoriesScreen({ navigation }: any) {
           {filtered.length === 0 ? (
             <View style={styles.empty}>
               <Text style={styles.emptyEmoji}>📂</Text>
-              <Text style={styles.emptyText}>Sin categorías personalizadas</Text>
-              <Text style={styles.emptySub}>Toca + para crear una nueva</Text>
+              <Text style={styles.emptyText}>{t.categories.emptyText}</Text>
+              <Text style={styles.emptySub}>{t.categories.emptySub}</Text>
             </View>
           ) : (
             filtered.map(cat => (
@@ -182,38 +182,37 @@ export default function CategoriesScreen({ navigation }: any) {
         </ScrollView>
       )}
 
-      {/* MODAL CREAR */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.overlay}>
           <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>Nueva categoría</Text>
+            <Text style={styles.sheetTitle}>{t.categories.newCategory}</Text>
 
-            <Text style={styles.fieldLabel}>Nombre</Text>
+            <Text style={styles.fieldLabel}>{t.categories.name}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ej: Mascotas, Deportes..."
+              placeholder={t.categories.namePlaceholder}
               placeholderTextColor={Colors.textSecondary}
               value={newName}
               onChangeText={setNewName}
               autoFocus
             />
 
-            <Text style={styles.fieldLabel}>Tipo</Text>
+            <Text style={styles.fieldLabel}>{t.categories.type}</Text>
             <View style={styles.typeRow}>
-              {(['expense', 'income'] as const).map(t => (
+              {(['expense', 'income'] as const).map(type => (
                 <TouchableOpacity
-                  key={t}
-                  style={[styles.typeChip, newType === t && styles.typeChipActive]}
-                  onPress={() => setNewType(t)}
+                  key={type}
+                  style={[styles.typeChip, newType === type && styles.typeChipActive]}
+                  onPress={() => setNewType(type)}
                 >
-                  <Text style={[styles.typeText, newType === t && styles.typeTextActive]}>
-                    {t === 'expense' ? 'Gasto' : 'Ingreso'}
+                  <Text style={[styles.typeText, newType === type && styles.typeTextActive]}>
+                    {type === 'expense' ? t.categories.expenseType : t.categories.incomeType}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={styles.fieldLabel}>Icono</Text>
+            <Text style={styles.fieldLabel}>{t.categories.icon}</Text>
             <View style={styles.emojiGrid}>
               {EMOJIS.map(e => (
                 <TouchableOpacity
@@ -226,7 +225,7 @@ export default function CategoriesScreen({ navigation }: any) {
               ))}
             </View>
 
-            <Text style={styles.fieldLabel}>Color</Text>
+            <Text style={styles.fieldLabel}>{t.categories.color}</Text>
             <View style={styles.colorGrid}>
               {COLORS.map(c => (
                 <TouchableOpacity
@@ -239,7 +238,7 @@ export default function CategoriesScreen({ navigation }: any) {
 
             <View style={styles.sheetButtons}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelText}>Cancelar</Text>
+                <Text style={styles.cancelText}>{t.common.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.saveBtn, saving && { opacity: 0.6 }]}
@@ -248,7 +247,7 @@ export default function CategoriesScreen({ navigation }: any) {
               >
                 {saving
                   ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={styles.saveText}>Crear</Text>
+                  : <Text style={styles.saveText}>{t.categories.create}</Text>
                 }
               </TouchableOpacity>
             </View>

@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Copy } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 
 const EMOJIS = ['👥', '🏠', '✈️', '🍽️', '🎉', '🏋️', '🎓', '💼', '🎮', '🏖️', '🚗', '❤️', '🎵', '⚽', '🛒', '🍕'];
@@ -30,6 +31,7 @@ const generateCode = (): string => {
 
 export default function CreateGroupScreen({ navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('👥');
@@ -41,7 +43,7 @@ export default function CreateGroupScreen({ navigation }: any) {
 
   const handleCreate = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Dale un nombre al grupo');
+      Alert.alert(t.common.error, t.createGroup.errors.noName);
       return;
     }
 
@@ -66,7 +68,7 @@ export default function CreateGroupScreen({ navigation }: any) {
 
     if (groupError) {
       setLoading(false);
-      Alert.alert('Error', groupError.message);
+      Alert.alert(t.common.error, groupError.message);
       return;
     }
 
@@ -77,7 +79,7 @@ export default function CreateGroupScreen({ navigation }: any) {
     setLoading(false);
 
     if (memberError) {
-      Alert.alert('Error', memberError.message);
+      Alert.alert(t.common.error, memberError.message);
     } else {
       setCreatedGroupName(name.trim());
       setCreatedCode(inviteCode);
@@ -87,14 +89,14 @@ export default function CreateGroupScreen({ navigation }: any) {
   const handleCopyCode = async () => {
     if (createdCode) {
       await Clipboard.setStringAsync(createdCode);
-      Alert.alert('¡Copiado!', 'Comparte este código con las personas que quieras invitar');
+      Alert.alert(t.common.copied, t.createGroup.copiedMsg);
     }
   };
 
   const handleShare = async () => {
     if (createdCode) {
       await Share.share({
-        message: `¡Únete a mi grupo "${createdGroupName}" en Numo! Código: ${createdCode}`,
+        message: t.createGroup.shareMsg(createdGroupName, createdCode),
       });
     }
   };
@@ -104,27 +106,25 @@ export default function CreateGroupScreen({ navigation }: any) {
       <SafeAreaView style={styles.safe}>
         <View style={styles.successContainer}>
           <Text style={styles.successEmoji}>🎉</Text>
-          <Text style={styles.successTitle}>¡Grupo creado!</Text>
-          <Text style={styles.successSub}>
-            Comparte este código para que tus amigos se unan
-          </Text>
+          <Text style={styles.successTitle}>{t.createGroup.successTitle}</Text>
+          <Text style={styles.successSub}>{t.createGroup.successSub}</Text>
 
           <View style={styles.codeCard}>
-            <Text style={styles.codeLabel}>Código de invitación</Text>
+            <Text style={styles.codeLabel}>{t.createGroup.inviteCode}</Text>
             <Text style={styles.codeText}>{createdCode}</Text>
             <View style={styles.codeButtons}>
               <TouchableOpacity style={styles.codeBtn} onPress={handleCopyCode}>
                 <Copy size={16} color={Colors.primary} />
-                <Text style={styles.codeBtnText}>Copiar</Text>
+                <Text style={styles.codeBtnText}>{t.common.copy}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.codeBtn, styles.codeBtnShare]} onPress={handleShare}>
-                <Text style={styles.codeBtnShareText}>Compartir</Text>
+                <Text style={styles.codeBtnShareText}>{t.common.share}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           <TouchableOpacity style={styles.doneButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.doneButtonText}>Ir al grupo</Text>
+            <Text style={styles.doneButtonText}>{t.createGroup.goToGroup}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -142,7 +142,7 @@ export default function CreateGroupScreen({ navigation }: any) {
             <TouchableOpacity onPress={() => navigation.goBack()}>
               <ChevronLeft size={28} color={Colors.textPrimary} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Nuevo grupo</Text>
+            <Text style={styles.headerTitle}>{t.createGroup.title}</Text>
             <View style={{ width: 28 }} />
           </View>
 
@@ -163,7 +163,7 @@ export default function CreateGroupScreen({ navigation }: any) {
                   <Text style={styles.emojiLarge}>{emoji}</Text>
                 </View>
                 <Text style={styles.emojiHint}>
-                  {showEmojiPicker ? 'Cerrar' : 'Cambiar icono'}
+                  {showEmojiPicker ? t.createGroup.closeIcon : t.createGroup.changeIcon}
                 </Text>
               </TouchableOpacity>
 
@@ -184,10 +184,10 @@ export default function CreateGroupScreen({ navigation }: any) {
 
             {/* NOMBRE */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Nombre del grupo</Text>
+              <Text style={styles.sectionLabel}>{t.createGroup.groupName}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Ej: Piso Madrid, Viaje Ibiza, Trabajo..."
+                placeholder={t.createGroup.groupNamePlaceholder}
                 placeholderTextColor={Colors.textSecondary}
                 value={name}
                 onChangeText={setName}
@@ -196,7 +196,7 @@ export default function CreateGroupScreen({ navigation }: any) {
 
             {/* MONEDA */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Moneda del grupo</Text>
+              <Text style={styles.sectionLabel}>{t.createGroup.groupCurrency}</Text>
               <View style={styles.currencyRow}>
                 {CURRENCIES.map(c => {
                   const isActive = currency === c.code;
@@ -225,7 +225,7 @@ export default function CreateGroupScreen({ navigation }: any) {
               disabled={loading}
             >
               <Text style={styles.buttonText}>
-                {loading ? 'Creando...' : 'Crear grupo'}
+                {loading ? t.createGroup.creating : t.createGroup.create}
               </Text>
             </TouchableOpacity>
           </ScrollView>

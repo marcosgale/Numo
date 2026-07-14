@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
@@ -15,6 +16,7 @@ type Group = {
 
 export default function GroupsScreen() {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const navigation = useNavigation<any>();
   const [groups, setGroups] = useState<Group[]>([]);
@@ -69,7 +71,7 @@ export default function GroupsScreen() {
 
   const handleJoinGroup = async () => {
     if (!joinCode.trim() || joinCode.trim().length !== 6) {
-      Alert.alert('Error', 'Introduce un código de 6 caracteres');
+      Alert.alert(t.common.error, t.groups.errors.invalidCode);
       return;
     }
 
@@ -86,7 +88,7 @@ export default function GroupsScreen() {
 
     if (!group) {
       setJoining(false);
-      Alert.alert('Error', 'No se encontró ningún grupo con ese código');
+      Alert.alert(t.common.error, t.groups.errors.notFound);
       return;
     }
 
@@ -99,7 +101,7 @@ export default function GroupsScreen() {
 
     if (existing) {
       setJoining(false);
-      Alert.alert('Info', 'Ya eres miembro de este grupo');
+      Alert.alert('Info', t.groups.errors.alreadyMember);
       setJoinModalVisible(false);
       setJoinCode('');
       return;
@@ -115,7 +117,7 @@ export default function GroupsScreen() {
     if (error) {
       Alert.alert('Error', error.message);
     } else {
-      Alert.alert('¡Te has unido!', `Ahora eres miembro de "${group.name}"`, [
+      Alert.alert(t.groups.joined, t.groups.joinedMsg(group.name), [
         { text: 'OK', onPress: () => { setJoinModalVisible(false); setJoinCode(''); } },
       ]);
     }
@@ -138,7 +140,7 @@ export default function GroupsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Grupos</Text>
+          <Text style={styles.headerTitle}>{t.groups.title}</Text>
         </View>
 
         {groups.length > 0 ? (
@@ -154,7 +156,7 @@ export default function GroupsScreen() {
                 <View style={styles.groupInfo}>
                   <Text style={styles.groupName}>{group.name}</Text>
                   <Text style={styles.groupMembers}>
-                    {group.memberCount} {group.memberCount === 1 ? 'miembro' : 'miembros'}
+                    {group.memberCount} {group.memberCount === 1 ? t.groups.member : t.groups.members}
                   </Text>
                 </View>
                 <Text style={styles.groupArrow}>›</Text>
@@ -166,33 +168,33 @@ export default function GroupsScreen() {
                 style={styles.actionButton}
                 onPress={() => navigation.navigate('CreateGroup')}
               >
-                <Text style={styles.actionButtonText}>Crear nuevo grupo</Text>
+                <Text style={styles.actionButtonText}>{t.groups.createGroup}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionButtonOutline}
                 onPress={() => setJoinModalVisible(true)}
               >
-                <Text style={styles.actionButtonOutlineText}>Unirse con código</Text>
+                <Text style={styles.actionButtonOutlineText}>{t.groups.joinWithCode}</Text>
               </TouchableOpacity>
             </View>
           </>
         ) : (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyEmoji}>👥</Text>
-            <Text style={styles.emptyText}>Sin grupos</Text>
-            <Text style={styles.emptySub}>Crea un grupo para compartir gastos con amigos o únete con un código</Text>
+            <Text style={styles.emptyText}>{t.groups.emptyTitle}</Text>
+            <Text style={styles.emptySub}>{t.groups.emptySub}</Text>
             <View style={styles.emptyButtons}>
               <TouchableOpacity
                 style={styles.emptyButton}
                 onPress={() => navigation.navigate('CreateGroup')}
               >
-                <Text style={styles.emptyButtonText}>Crear grupo</Text>
+                <Text style={styles.emptyButtonText}>{t.groups.createGroupBtn}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.emptyButton, styles.emptyButtonOutline]}
                 onPress={() => setJoinModalVisible(true)}
               >
-                <Text style={[styles.emptyButtonText, { color: Colors.primary }]}>Unirse con código</Text>
+                <Text style={[styles.emptyButtonText, { color: Colors.primary }]}>{t.groups.joinBtn}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -209,8 +211,8 @@ export default function GroupsScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>Unirse a un grupo</Text>
-            <Text style={styles.modalSub}>Introduce el código de 6 caracteres que te han compartido</Text>
+            <Text style={styles.modalTitle}>{t.groups.joinGroupTitle}</Text>
+            <Text style={styles.modalSub}>{t.groups.joinGroupSub}</Text>
             <TextInput
               style={styles.codeInput}
               placeholder="ABCDEF"
@@ -226,14 +228,14 @@ export default function GroupsScreen() {
                 style={styles.modalCancel}
                 onPress={() => { setJoinModalVisible(false); setJoinCode(''); }}
               >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
+                <Text style={styles.modalCancelText}>{t.common.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalJoin, joining && { opacity: 0.6 }]}
                 onPress={handleJoinGroup}
                 disabled={joining}
               >
-                <Text style={styles.modalJoinText}>{joining ? 'Uniendo...' : 'Unirse'}</Text>
+                <Text style={styles.modalJoinText}>{joining ? t.groups.joining : t.groups.join}</Text>
               </TouchableOpacity>
             </View>
           </View>

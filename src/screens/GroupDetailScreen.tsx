@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Plus, Copy, LogOut } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -59,6 +60,7 @@ type Tab = 'gastos' | 'balances' | 'miembros';
 
 export default function GroupDetailScreen({ route, navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const { groupId } = route.params;
   const [group, setGroup] = useState<any>(null);
@@ -131,12 +133,12 @@ export default function GroupDetailScreen({ route, navigation }: any) {
       ...e,
       currency: e.currency || 'EUR',
       base_amount: Number(e.base_amount ?? e.amount),
-      payer_name: memberMap[e.paid_by] || 'Desconocido',
+      payer_name: memberMap[e.paid_by] || t.groupDetail.unknown,
       splits: (splitsData || [])
         .filter(s => s.group_expense_id === e.id)
         .map(s => ({
           userId: s.user_id,
-          name: memberMap[s.user_id] || 'Desconocido',
+          name: memberMap[s.user_id] || t.groupDetail.unknown,
           amount: Number(s.amount),
           is_paid: s.is_paid,
         })),
@@ -180,7 +182,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
       const rounded = Math.round(balance * 100) / 100;
       return {
         userId,
-        name: memberMap[userId] || 'Desconocido',
+        name: memberMap[userId] || t.groupDetail.unknown,
         balance: Math.abs(rounded) <= 0.01 ? 0 : rounded,
       };
     });
@@ -238,37 +240,37 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
-    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+    return date.toLocaleDateString(t.groupDetail.locale, { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
   const formatDateShort = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
-    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    return date.toLocaleDateString(t.groupDetail.locale, { day: 'numeric', month: 'short' });
   };
 
   const handleCopyCode = async () => {
     if (group?.invite_code) {
       await Clipboard.setStringAsync(group.invite_code);
-      Alert.alert('¡Copiado!', `Código: ${group.invite_code}`);
+      Alert.alert(t.common.copied, `${t.groupDetail.inviteCode}: ${group.invite_code}`);
     }
   };
 
   const handleShareCode = async () => {
     if (group?.invite_code) {
       await Share.share({
-        message: `¡Únete a mi grupo "${group.name}" en Numo! Código: ${group.invite_code}`,
+        message: t.groupDetail.shareGroupMsg(group.name, group.invite_code),
       });
     }
   };
 
   const handleLeaveGroup = () => {
     Alert.alert(
-      'Salir del grupo',
-      '¿Estás seguro de que quieres abandonar este grupo?',
+      t.groupDetail.leaveGroupTitle,
+      t.groupDetail.leaveGroupMsg,
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Salir',
+          text: t.groupDetail.leave,
           style: 'destructive',
           onPress: async () => {
             const { error } = await supabase
@@ -276,7 +278,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
               .delete()
               .eq('group_id', groupId)
               .eq('user_id', currentUserId);
-            if (error) Alert.alert('Error', error.message);
+            if (error) Alert.alert(t.common.error, error.message);
             else navigation.goBack();
           },
         },
@@ -286,18 +288,18 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
   const handleDeleteExpense = (expenseId: string) => {
     Alert.alert(
-      'Eliminar gasto',
-      '¿Estás seguro? Esta acción no se puede deshacer.',
+      t.groupDetail.deleteExpense,
+      t.groupDetail.deleteExpenseMsg,
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Eliminar',
+          text: t.common.delete,
           style: 'destructive',
           onPress: async () => {
             await supabase.from('group_expense_splits').delete().eq('group_expense_id', expenseId);
             const { error } = await supabase.from('group_expenses').delete().eq('id', expenseId);
             if (error) {
-              Alert.alert('Error', error.message);
+              Alert.alert(t.common.error, error.message);
             } else {
               setSelectedExpense(null);
               fetchData();
@@ -310,12 +312,12 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
   const handleSettle = (debt: Debt) => {
     Alert.alert(
-      'Confirmar pago recibido',
-      `¿Confirmas que ${debt.fromName.split(' ')[0]} te ha pagado ${formatMoney(debt.amount)}${groupCurrencySymbol}?`,
+      t.groupDetail.confirmPaymentTitle,
+      t.groupDetail.confirmPaymentMsg(debt.fromName.split(' ')[0], formatMoney(debt.amount), groupCurrencySymbol),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Confirmar',
+          text: t.common.confirm,
           onPress: async () => {
             const today = new Date().toISOString().split('T')[0];
 
@@ -328,7 +330,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
               date: today,
             });
 
-            if (error) { Alert.alert('Error', error.message); return; }
+            if (error) { Alert.alert(t.common.error, error.message); return; }
 
             await supabase.from('transactions').insert({
               user_id: currentUserId,
@@ -336,7 +338,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
               amount: debt.amount,
               base_amount: debt.amount,
               currency: group?.currency || 'EUR',
-              description: `Cobrado de ${debt.fromName.split(' ')[0]}`,
+              description: t.groupDetail.collectedFrom(debt.fromName.split(' ')[0]),
               date: today,
               is_recurring: false,
             });
@@ -374,12 +376,12 @@ export default function GroupDetailScreen({ route, navigation }: any) {
       {expenses.length > 0 && (
         <View style={styles.summaryCard}>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Total grupo</Text>
+            <Text style={styles.summaryLabel}>{t.groupDetail.totalGroup}</Text>
             <Text style={styles.summaryValue}>{formatMoney(totalGroupExpenses)}{groupCurrencySymbol}</Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Tu parte</Text>
+            <Text style={styles.summaryLabel}>{t.groupDetail.myPart}</Text>
             <Text style={styles.summaryValue}>{formatMoney(mySpent)}{groupCurrencySymbol}</Text>
           </View>
         </View>
@@ -400,7 +402,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
               <View style={styles.expenseInfo}>
                 <Text style={styles.expenseName}>{exp.description}</Text>
                 <Text style={styles.expenseMeta}>
-                  {exp.paid_by === currentUserId ? 'Tú' : exp.payer_name.split(' ')[0]} · {formatDateShort(exp.date)}
+                  {exp.paid_by === currentUserId ? t.groupDetail.you : exp.payer_name.split(' ')[0]} · {formatDateShort(exp.date)}
                 </Text>
               </View>
               <Text style={styles.expenseAmount}>{formatMoney(Number(exp.amount))}{getCurrencySymbol(exp.currency)}</Text>
@@ -410,8 +412,8 @@ export default function GroupDetailScreen({ route, navigation }: any) {
       ) : (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyEmoji}>🧾</Text>
-          <Text style={styles.emptyText}>Sin gastos aún</Text>
-          <Text style={styles.emptySub}>Toca el + para añadir el primer gasto del grupo</Text>
+          <Text style={styles.emptyText}>{t.groupDetail.noExpenses}</Text>
+          <Text style={styles.emptySub}>{t.groupDetail.noExpensesSub}</Text>
         </View>
       )}
     </>
@@ -426,7 +428,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
           <View style={[styles.myBalanceCard, {
             borderColor: myBal.balance > 0.01 ? Colors.positive : myBal.balance < -0.01 ? Colors.negative : Colors.border,
           }]}>
-            <Text style={styles.myBalanceLabel}>Tu saldo</Text>
+            <Text style={styles.myBalanceLabel}>{t.groupDetail.myBalance}</Text>
             <Text style={[styles.myBalanceAmount, {
               color: myBal.balance > 0.01 ? Colors.positive : myBal.balance < -0.01 ? Colors.negative : Colors.textSecondary,
             }]}>
@@ -434,10 +436,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             </Text>
             <Text style={styles.myBalanceSub}>
               {myBal.balance > 0.01
-                ? 'Te deben dinero'
+                ? t.groupDetail.owedToYou
                 : myBal.balance < -0.01
-                ? 'Debes dinero'
-                : 'Estás al día 🎉'}
+                ? t.groupDetail.youOwe
+                : t.groupDetail.upToDate}
             </Text>
           </View>
         )}
@@ -449,7 +451,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 <Text style={styles.memberInitial}>{mb.name[0]?.toUpperCase() || '?'}</Text>
               </View>
               <Text style={styles.balanceName}>
-                {mb.userId === currentUserId ? 'Tú' : mb.name.split(' ')[0]}
+                {mb.userId === currentUserId ? t.groupDetail.you : mb.name.split(' ')[0]}
               </Text>
               <Text style={[
                 styles.balanceAmount,
@@ -463,26 +465,20 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
         {debts.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>¿Quién paga a quién?</Text>
+            <Text style={styles.sectionTitle}>{t.groupDetail.whoPaysWho}</Text>
             <View style={styles.card}>
               {debts.map((debt, index) => (
                 <View key={index} style={[styles.debtRow, index < debts.length - 1 && styles.border]}>
                   <View style={styles.debtInfo}>
                     <Text style={styles.debtText}>
                       {debt.to === currentUserId ? (
-                        <>
-                          <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
-                            {debt.fromName.split(' ')[0]}
-                          </Text>
-                          <Text style={{ color: Colors.textSecondary }}> te paga</Text>
-                        </>
+                        <Text style={{ color: Colors.textPrimary }}>
+                          {t.groupDetail.paysYou(debt.fromName.split(' ')[0])}
+                        </Text>
                       ) : debt.from === currentUserId ? (
-                        <>
-                          <Text style={{ color: Colors.textSecondary }}>Pagas a </Text>
-                          <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
-                            {debt.toName.split(' ')[0]}
-                          </Text>
-                        </>
+                        <Text style={{ color: Colors.textPrimary }}>
+                          {t.groupDetail.youPay(debt.toName.split(' ')[0])}
+                        </Text>
                       ) : (
                         <>
                           <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
@@ -504,7 +500,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                       style={styles.settleBtn}
                       onPress={() => handleSettle(debt)}
                     >
-                      <Text style={styles.settleBtnText}>Cobrado ✓</Text>
+                      <Text style={styles.settleBtnText}>{t.groupDetail.settled}</Text>
                     </TouchableOpacity>
                   ) : (
                     <Text style={[styles.debtAmount, { color: Colors.negative }]}>
@@ -530,14 +526,14 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             </View>
             <Text style={styles.memberName}>
               {m.first_name} {m.last_name}
-              {m.user_id === currentUserId ? ' (tú)' : ''}
+              {m.user_id === currentUserId ? t.groupDetail.youSuffix : ''}
             </Text>
           </View>
         ))}
       </View>
 
       <View style={styles.codeCard}>
-        <Text style={styles.codeLabel}>Código de invitación</Text>
+        <Text style={styles.codeLabel}>{t.groupDetail.inviteCode}</Text>
         <View style={styles.codeRow}>
           <Text style={styles.codeValue}>{group.invite_code}</Text>
           <View style={styles.codeActions}>
@@ -545,7 +541,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
               <Copy size={16} color={Colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity style={[styles.codeBtn, { paddingHorizontal: Spacing.sm }]} onPress={handleShareCode}>
-              <Text style={styles.shareText}>Compartir</Text>
+              <Text style={styles.shareText}>{t.groupDetail.share}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -553,7 +549,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
       <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveGroup}>
         <LogOut size={18} color={Colors.negative} />
-        <Text style={styles.leaveText}>Salir del grupo</Text>
+        <Text style={styles.leaveText}>{t.groupDetail.leaveGroup}</Text>
       </TouchableOpacity>
     </>
   );
@@ -579,14 +575,18 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
       {/* TABS */}
       <View style={styles.tabs}>
-        {(['gastos', 'balances', 'miembros'] as Tab[]).map(tab => (
+        {([
+          { key: 'gastos' as Tab, label: t.groupDetail.tabs.expenses },
+          { key: 'balances' as Tab, label: t.groupDetail.tabs.balances },
+          { key: 'miembros' as Tab, label: t.groupDetail.tabs.members },
+        ]).map(({ key, label }) => (
           <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => setActiveTab(tab)}
+            key={key}
+            style={[styles.tab, activeTab === key && styles.tabActive]}
+            onPress={() => setActiveTab(key)}
           >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            <Text style={[styles.tabText, activeTab === key && styles.tabTextActive]}>
+              {label}
             </Text>
           </TouchableOpacity>
         ))}
@@ -619,22 +619,22 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
               <View style={styles.modalMeta}>
                 <Text style={styles.modalMetaText}>
-                  Pagado por{' '}
+                  {t.groupDetail.paidBy}{' '}
                   <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
-                    {selectedExpense.paid_by === currentUserId ? 'ti' : selectedExpense.payer_name.split(' ')[0]}
+                    {selectedExpense.paid_by === currentUserId ? t.groupDetail.you.toLowerCase() : selectedExpense.payer_name.split(' ')[0]}
                   </Text>
                 </Text>
                 <Text style={styles.modalMetaText}>{formatDate(selectedExpense.date)}</Text>
                 {selectedExpense.currency !== (group?.currency || 'EUR') && (
                   <Text style={styles.modalConversionText}>
-                    ≈ {formatMoney(selectedExpense.base_amount)}{getCurrencySymbol(group?.currency || 'EUR')} · tipo de cambio aplicado
+                    {t.groupDetail.conversionNote(formatMoney(selectedExpense.base_amount), getCurrencySymbol(group?.currency || 'EUR'))}
                   </Text>
                 )}
               </View>
 
               {selectedExpense.splits.length > 0 && (
                 <View style={styles.modalSection}>
-                  <Text style={styles.modalSectionTitle}>Participantes</Text>
+                  <Text style={styles.modalSectionTitle}>{t.groupDetail.participants}</Text>
                   <View style={styles.card}>
                     {selectedExpense.splits.map((split, i) => (
                       <View
@@ -645,7 +645,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                           <Text style={styles.memberInitial}>{split.name[0]?.toUpperCase() || '?'}</Text>
                         </View>
                         <Text style={styles.modalSplitName}>
-                          {split.userId === currentUserId ? 'Tú' : split.name.split(' ')[0]}
+                          {split.userId === currentUserId ? t.groupDetail.you : split.name.split(' ')[0]}
                         </Text>
                         <Text style={styles.modalSplitAmount}>{formatMoney(split.amount)}{getCurrencySymbol(selectedExpense.currency)}</Text>
                       </View>
@@ -667,13 +667,13 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                     });
                   }}
                 >
-                  <Text style={styles.modalEditText}>Editar</Text>
+                  <Text style={styles.modalEditText}>{t.common.edit}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.modalDeleteBtn}
                   onPress={() => handleDeleteExpense(selectedExpense.id)}
                 >
-                  <Text style={styles.modalDeleteText}>Eliminar</Text>
+                  <Text style={styles.modalDeleteText}>{t.common.delete}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -681,7 +681,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 style={styles.modalCloseBtn}
                 onPress={() => setSelectedExpense(null)}
               >
-                <Text style={styles.modalCloseText}>Cerrar</Text>
+                <Text style={styles.modalCloseText}>{t.common.close}</Text>
               </TouchableOpacity>
             </View>
           </View>

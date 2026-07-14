@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, Trash2 } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
@@ -22,6 +23,7 @@ type SpentMap = { [categoryId: string]: number };
 
 export default function LimitsScreen() {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const navigation = useNavigation<any>();
   const [limits, setLimits] = useState<Limit[]>([]);
@@ -40,7 +42,6 @@ export default function LimitsScreen() {
 
         if (limitsData) setLimits(limitsData as any);
 
-        // Calcular gasto por categoría según periodo
         const now = new Date();
         const spentMap: SpentMap = {};
 
@@ -68,7 +69,7 @@ export default function LimitsScreen() {
 
             if (txData) {
               spentMap[limit.categories.id] = txData.reduce(
-                (sum: number, t: any) => sum + Number(t.base_amount), 0
+                (sum: number, tx: any) => sum + Number(tx.base_amount), 0
               );
             }
           }
@@ -83,12 +84,12 @@ export default function LimitsScreen() {
 
   const handleDelete = (limitId: string, categoryName: string) => {
     Alert.alert(
-      'Eliminar límite',
-      `¿Eliminar el límite de ${categoryName}?`,
+      t.goals.deleteLimit,
+      t.goals.deleteLimitMsg(categoryName),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Eliminar',
+          text: t.common.delete,
           style: 'destructive',
           onPress: async () => {
             await supabase.from('limits').delete().eq('id', limitId);
@@ -101,15 +102,6 @@ export default function LimitsScreen() {
 
   const formatMoney = (value: number) => {
     return value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
-  const getPeriodLabel = (period: string) => {
-    switch (period) {
-      case 'daily': return 'Diario';
-      case 'weekly': return 'Semanal';
-      case 'monthly': return 'Mensual';
-      default: return period;
-    }
   };
 
   const getBarColor = (pct: number) => {
@@ -135,7 +127,7 @@ export default function LimitsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Límites de gasto</Text>
+          <Text style={styles.headerTitle}>{t.goals.limitsScreenTitle}</Text>
           <TouchableOpacity
             style={styles.addBtn}
             onPress={() => navigation.navigate('AddLimit')}
@@ -160,7 +152,7 @@ export default function LimitsScreen() {
                     </View>
                     <View style={styles.limitInfo}>
                       <Text style={styles.limitName}>{limit.categories.name}</Text>
-                      <Text style={styles.limitPeriod}>{getPeriodLabel(limit.period)}</Text>
+                      <Text style={styles.limitPeriod}>{t.goals.periods[limit.period as keyof typeof t.goals.periods] ?? limit.period}</Text>
                     </View>
                     <TouchableOpacity onPress={() => handleDelete(limit.id, limit.categories.name)}>
                       <Trash2 size={18} color={Colors.textSecondary} />
@@ -175,13 +167,13 @@ export default function LimitsScreen() {
                     <Text style={[styles.limitSpent, isOver && { color: Colors.negative }]}>
                       {formatMoney(catSpent)}€
                     </Text>
-                    <Text style={styles.limitTotal}>de {formatMoney(Number(limit.amount))}€</Text>
+                    <Text style={styles.limitTotal}>{t.common.of} {formatMoney(Number(limit.amount))}€</Text>
                   </View>
 
                   {isOver && (
                     <View style={styles.overBadge}>
                       <Text style={styles.overText}>
-                        ⚠️ Superado por {formatMoney(catSpent - Number(limit.amount))}€
+                        {t.goals.exceeded(formatMoney(catSpent - Number(limit.amount)))}
                       </Text>
                     </View>
                   )}
@@ -189,7 +181,7 @@ export default function LimitsScreen() {
                   {pct >= 80 && !isOver && (
                     <View style={styles.warningBadge}>
                       <Text style={styles.warningText}>
-                        ⚡ Llevas el {Math.round(pct)}% del límite
+                        {t.goals.nearLimit(String(Math.round(pct)))}
                       </Text>
                     </View>
                   )}
@@ -200,13 +192,13 @@ export default function LimitsScreen() {
         ) : (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyEmoji}>📊</Text>
-            <Text style={styles.emptyText}>Sin límites configurados</Text>
-            <Text style={styles.emptySub}>Establece topes de gasto por categoría para controlar mejor tu dinero</Text>
+            <Text style={styles.emptyText}>{t.goals.emptyLimitTitle}</Text>
+            <Text style={styles.emptySub}>{t.goals.emptyLimitSub}</Text>
             <TouchableOpacity
               style={styles.emptyButton}
               onPress={() => navigation.navigate('AddLimit')}
             >
-              <Text style={styles.emptyButtonText}>Crear límite</Text>
+              <Text style={styles.emptyButtonText}>{t.goals.createLimit}</Text>
             </TouchableOpacity>
           </View>
         )}

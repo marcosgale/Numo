@@ -6,10 +6,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Eye, EyeOff } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 
 export default function PrivacyScreen({ navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
 
   const [newPassword, setNewPassword] = useState('');
@@ -21,11 +23,11 @@ export default function PrivacyScreen({ navigation }: any) {
 
   const handleChangePassword = async () => {
     if (newPassword.length < 8) {
-      Alert.alert('Error', 'La contraseña debe tener al menos 8 caracteres');
+      Alert.alert(t.common.error, t.privacy.errors.shortPassword);
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'Las contraseñas no coinciden');
+      Alert.alert(t.common.error, t.privacy.errors.mismatch);
       return;
     }
 
@@ -34,22 +36,22 @@ export default function PrivacyScreen({ navigation }: any) {
     setSavingPwd(false);
 
     if (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert(t.common.error, error.message);
     } else {
       setNewPassword('');
       setConfirmPassword('');
-      Alert.alert('¡Contraseña actualizada!', 'Tu contraseña ha sido cambiada correctamente');
+      Alert.alert(t.privacy.success, t.privacy.successMsg);
     }
   };
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Eliminar cuenta',
-      '¿Estás seguro? Esta acción eliminará todos tus datos y no se puede deshacer.',
+      t.privacy.deleteTitle,
+      t.privacy.deleteMsg,
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Eliminar',
+          text: t.common.delete,
           style: 'destructive',
           onPress: confirmDelete,
         },
@@ -72,7 +74,7 @@ export default function PrivacyScreen({ navigation }: any) {
 
     const { error } = await supabase.rpc('delete_user');
     if (error) {
-      Alert.alert('Error', 'No se pudo eliminar la cuenta: ' + error.message);
+      Alert.alert(t.common.error, t.privacy.deleteError + error.message);
       setDeletingAccount(false);
       return;
     }
@@ -87,19 +89,18 @@ export default function PrivacyScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ChevronLeft size={28} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Privacidad y seguridad</Text>
+        <Text style={styles.headerTitle}>{t.privacy.title}</Text>
         <View style={{ width: 28 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
-        {/* CAMBIAR CONTRASEÑA */}
-        <Text style={styles.sectionLabel}>Cambiar contraseña</Text>
+        <Text style={styles.sectionLabel}>{t.privacy.changePassword}</Text>
         <View style={styles.card}>
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.input}
-              placeholder="Nueva contraseña"
+              placeholder={t.privacy.newPassword}
               placeholderTextColor={Colors.textSecondary}
               value={newPassword}
               onChangeText={setNewPassword}
@@ -116,7 +117,7 @@ export default function PrivacyScreen({ navigation }: any) {
           <View style={[styles.inputWrapper, styles.inputBorder]}>
             <TextInput
               style={styles.input}
-              placeholder="Confirmar contraseña"
+              placeholder={t.privacy.confirmPassword}
               placeholderTextColor={Colors.textSecondary}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
@@ -138,17 +139,14 @@ export default function PrivacyScreen({ navigation }: any) {
         >
           {savingPwd
             ? <ActivityIndicator size="small" color="#fff" />
-            : <Text style={styles.buttonText}>Actualizar contraseña</Text>
+            : <Text style={styles.buttonText}>{t.privacy.updatePassword}</Text>
           }
         </TouchableOpacity>
 
-        {/* ZONA DE PELIGRO */}
-        <Text style={[styles.sectionLabel, { marginTop: Spacing.xl }]}>Zona de peligro</Text>
+        <Text style={[styles.sectionLabel, { marginTop: Spacing.xl }]}>{t.privacy.dangerZone}</Text>
         <View style={styles.dangerCard}>
-          <Text style={styles.dangerTitle}>Eliminar cuenta</Text>
-          <Text style={styles.dangerDesc}>
-            Se eliminarán todos tus datos: transacciones, metas, límites y grupos. Esta acción no se puede deshacer.
-          </Text>
+          <Text style={styles.dangerTitle}>{t.privacy.deleteAccount}</Text>
+          <Text style={styles.dangerDesc}>{t.privacy.deleteAccountDesc}</Text>
           <TouchableOpacity
             style={[styles.deleteButton, deletingAccount && styles.buttonDisabled]}
             onPress={handleDeleteAccount}
@@ -156,7 +154,7 @@ export default function PrivacyScreen({ navigation }: any) {
           >
             {deletingAccount
               ? <ActivityIndicator size="small" color={Colors.negative} />
-              : <Text style={styles.deleteButtonText}>Eliminar mi cuenta</Text>
+              : <Text style={styles.deleteButtonText}>{t.privacy.deleteAccountBtn}</Text>
             }
           </TouchableOpacity>
         </View>

@@ -3,44 +3,11 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
-
-const FAQS = [
-  {
-    q: '¿Cómo funciona el saldo disponible?',
-    a: 'Numo calcula tu saldo sumando todos tus ingresos y restando todos tus gastos del mes actual. Los ahorros vinculados a metas también se descuentan del saldo.',
-  },
-  {
-    q: '¿Qué es la moneda base?',
-    a: 'La moneda base es en la que se muestran tus totales y balances. Puedes añadir transacciones en otras monedas — Numo las convierte automáticamente usando el tipo de cambio actual.',
-  },
-  {
-    q: '¿Cómo funciona el módulo de grupos?',
-    a: 'Los grupos permiten compartir gastos con otras personas. Crea un grupo, invita a tus amigos con el código de invitación, y añade gastos compartidos. Numo calcula automáticamente quién debe a quién.',
-  },
-  {
-    q: '¿Puedo editar o eliminar una transacción?',
-    a: 'Sí. Desde el historial o el Dashboard, toca cualquier transacción para ver sus detalles. Desde ahí puedes editarla o eliminarla.',
-  },
-  {
-    q: '¿Cómo funcionan las metas de ahorro?',
-    a: 'Crea una meta con un nombre, cantidad objetivo y fecha límite. Cada vez que añadas dinero a una meta, se registra como un gasto en tu cuenta (categoría Ahorro) y se suma al progreso de tu meta.',
-  },
-  {
-    q: '¿Qué son los límites de gasto?',
-    a: 'Los límites te permiten establecer un tope de gasto por categoría (diario, semanal o mensual). Numo te avisa cuando te estás acercando al límite.',
-  },
-  {
-    q: '¿Es segura mi información financiera?',
-    a: 'Sí. Numo usa Supabase como base de datos con autenticación segura y políticas de acceso que garantizan que solo tú puedes ver tus datos. Nunca compartimos tu información con terceros.',
-  },
-  {
-    q: '¿Puedo usar Numo sin conexión a internet?',
-    a: 'Por el momento Numo requiere conexión a internet para sincronizar tus datos. Estamos trabajando en un modo offline para una futura versión.',
-  },
-];
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function HelpScreen({ navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
@@ -50,14 +17,14 @@ export default function HelpScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ChevronLeft size={28} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ayuda</Text>
+        <Text style={styles.headerTitle}>{t.help.title}</Text>
         <View style={{ width: 28 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.subtitle}>Preguntas frecuentes</Text>
+        <Text style={styles.subtitle}>{t.help.faqTitle}</Text>
 
-        {FAQS.map((faq, i) => {
+        {t.help.faqs.map((faq, i) => {
           const isOpen = openIndex === i;
           return (
             <TouchableOpacity
@@ -79,9 +46,9 @@ export default function HelpScreen({ navigation }: any) {
         })}
 
         <View style={styles.contactCard}>
-          <Text style={styles.contactTitle}>¿Tienes más preguntas?</Text>
+          <Text style={styles.contactTitle}>{t.help.contactTitle}</Text>
           <Text style={styles.contactText}>
-            Escríbenos a{' '}
+            {t.help.contactText}{' '}
             <Text style={styles.contactEmail}>marcosgl2705@gmail.com</Text>
           </Text>
         </View>

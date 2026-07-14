@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronDown, Trash2 } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 
 type Category = {
@@ -43,14 +44,9 @@ const CURRENCIES = [
   { code: 'THB', symbol: '฿', name: 'Baht tailandés' },
 ];
 
-const PERIODS = [
-  { value: 'weekly', label: 'Semanal', description: 'Cada semana' },
-  { value: 'monthly', label: 'Mensual', description: 'Cada mes' },
-  { value: 'yearly', label: 'Anual', description: 'Cada año' },
-];
-
 export default function AddTransactionScreen({ route, navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const { type, isRecurring, transaction } = route.params;
   const isEditing = !!transaction;
@@ -154,17 +150,16 @@ export default function AddTransactionScreen({ route, navigation }: any) {
 
   const handleSave = async () => {
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Error', 'Introduce un importe válido');
+      Alert.alert(t.common.error, t.addTransaction.errors.invalidAmount);
       return;
     }
     if (baseAmount === null) {
-      Alert.alert('Error', 'Esperando conversión de moneda...');
+      Alert.alert(t.common.error, t.addTransaction.errors.waitingConversion);
       return;
     }
 
-    // Validar que las asignaciones no superen el importe
     if (type === 'income' && totalAllocated > parseFloat(amount)) {
-      Alert.alert('Error', 'Has asignado más dinero a metas del que estás ingresando');
+      Alert.alert(t.common.error, t.addTransaction.errors.overAllocated);
       return;
     }
 
@@ -172,7 +167,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      Alert.alert('Error', 'No hay sesión activa');
+      Alert.alert(t.common.error, t.addTransaction.errors.noSession);
       setLoading(false);
       return;
     }
@@ -206,7 +201,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
 
     if (error) {
       setLoading(false);
-      Alert.alert('Error', error.message);
+      Alert.alert(t.common.error, error.message);
       return;
     }
 
@@ -256,24 +251,24 @@ export default function AddTransactionScreen({ route, navigation }: any) {
     setLoading(false);
 
     const savedMsg = totalAllocated > 0
-      ? `${isRecurring ? 'Gasto recurrente registrado' : type === 'expense' ? 'Gasto registrado' : 'Ingreso registrado'}. Has apartado ${totalAllocated.toFixed(2)}€ para tus metas.`
+      ? t.addTransaction.success.savedGoals(totalAllocated.toFixed(2))
       : '';
 
     Alert.alert(
-      isEditing ? '¡Actualizado!' : isRecurring ? '¡Gasto recurrente registrado!' : type === 'expense' ? '¡Gasto registrado!' : '¡Ingreso registrado!',
+      isEditing ? t.addTransaction.success.updated : isRecurring ? t.addTransaction.success.recurring : type === 'expense' ? t.addTransaction.success.expense : t.addTransaction.success.income,
       savedMsg,
-      [{ text: 'OK', onPress: () => navigation.goBack() }]
+      [{ text: t.common.ok, onPress: () => navigation.goBack() }]
     );
   };
 
   const handleDelete = () => {
     Alert.alert(
-      'Eliminar movimiento',
-      '¿Estás seguro? Esta acción no se puede deshacer.',
+      t.addTransaction.deleteTransaction,
+      t.addTransaction.deleteConfirm,
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Eliminar',
+          text: t.common.delete,
           style: 'destructive',
           onPress: async () => {
             setLoading(true);
@@ -284,10 +279,10 @@ export default function AddTransactionScreen({ route, navigation }: any) {
             setLoading(false);
 
             if (error) {
-              Alert.alert('Error', error.message);
+              Alert.alert(t.common.error, error.message);
             } else {
-              Alert.alert('Eliminado', 'El movimiento ha sido eliminado', [
-                { text: 'OK', onPress: () => navigation.goBack() },
+              Alert.alert(t.addTransaction.deleted, t.addTransaction.deletedMsg, [
+                { text: t.common.ok, onPress: () => navigation.goBack() },
               ]);
             }
           },
@@ -315,8 +310,8 @@ export default function AddTransactionScreen({ route, navigation }: any) {
   const baseCurrencySymbol = CURRENCIES.find(c => c.code === baseCurrency)?.symbol || '€';
 
   const getHeaderTitle = () => {
-    if (isEditing) return isRecurring ? 'Editar recurrente' : type === 'expense' ? 'Editar gasto' : 'Editar ingreso';
-    return isRecurring ? 'Nuevo gasto recurrente' : type === 'expense' ? 'Nuevo gasto' : 'Nuevo ingreso';
+    if (isEditing) return isRecurring ? t.addTransaction.editRecurring : type === 'expense' ? t.addTransaction.editExpense : t.addTransaction.editIncome;
+    return isRecurring ? t.addTransaction.newRecurring : type === 'expense' ? t.addTransaction.newExpense : t.addTransaction.newIncome;
   };
 
   const formatMoney = (value: number) => {
@@ -347,7 +342,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
         >
           {/* IMPORTE + MONEDA */}
           <View style={styles.amountSection}>
-            <Text style={styles.amountLabel}>Importe</Text>
+            <Text style={styles.amountLabel}>{t.addTransaction.amount}</Text>
             <View style={styles.amountRow}>
               <TextInput
                 style={styles.amountInput}
@@ -372,10 +367,10 @@ export default function AddTransactionScreen({ route, navigation }: any) {
                   <ActivityIndicator size="small" color={Colors.primary} />
                 ) : baseAmount !== null ? (
                   <Text style={styles.conversionText}>
-                    ≈ {baseAmount.toFixed(2)} {baseCurrencySymbol} al cambio actual
+                    ≈ {baseAmount.toFixed(2)} {baseCurrencySymbol}
                   </Text>
                 ) : (
-                  <Text style={styles.conversionError}>No se pudo obtener el tipo de cambio</Text>
+                  <Text style={styles.conversionError}>{t.addTransaction.conversionError}</Text>
                 )}
               </View>
             )}
@@ -383,10 +378,10 @@ export default function AddTransactionScreen({ route, navigation }: any) {
 
           {/* CONCEPTO */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Concepto</Text>
+            <Text style={styles.sectionLabel}>{t.addTransaction.concept}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ej: Netflix, Mercadona, Alquiler..."
+              placeholder={t.addTransaction.conceptPlaceholder}
               placeholderTextColor={Colors.textSecondary}
               value={concept}
               onChangeText={setConcept}
@@ -396,9 +391,9 @@ export default function AddTransactionScreen({ route, navigation }: any) {
           {/* FRECUENCIA */}
           {isRecurring && (
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Frecuencia</Text>
+              <Text style={styles.sectionLabel}>{t.addTransaction.frequency}</Text>
               <View style={styles.periodRow}>
-                {PERIODS.map((period) => (
+                {t.addTransaction.periods.map((period) => (
                   <TouchableOpacity
                     key={period.value}
                     style={[
@@ -429,21 +424,21 @@ export default function AddTransactionScreen({ route, navigation }: any) {
           {isRecurring && (
             <View style={styles.recurringNotice}>
               <Text style={styles.recurringNoticeText}>
-                ℹ️  Este gasto se registra ahora como recurrente, pero no se crea automáticamente cada período. Tendrás que añadirlo manualmente cada vez.
+                {t.addTransaction.recurringNotice}
               </Text>
             </View>
           )}
 
           {/* CATEGORÍAS */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Categoría (opcional)</Text>
+            <Text style={styles.sectionLabel}>{t.addTransaction.categoryOptional}</Text>
             <View style={styles.categoryGrid}>
               {selectedCategory && (
                 <TouchableOpacity
                   style={[styles.categoryChip, { backgroundColor: Colors.border + '40', borderColor: Colors.border }]}
                   onPress={() => setSelectedCategory(null)}
                 >
-                  <Text style={styles.categoryName}>✕ Quitar</Text>
+                  <Text style={styles.categoryName}>{t.addTransaction.remove}</Text>
                 </TouchableOpacity>
               )}
               {categories.map((cat) => (
@@ -470,7 +465,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
           {/* APARTAR PARA METAS (solo ingresos, no edición) */}
           {type === 'income' && !isEditing && goals.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>¿Apartar para tus metas?</Text>
+              <Text style={styles.sectionLabel}>{t.addTransaction.allocateGoals}</Text>
               <View style={styles.goalsCard}>
                 {goals.map((goal) => {
                   const remaining = Number(goal.target_amount) - Number(goal.current_amount);
@@ -482,7 +477,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
                         <View style={{ flex: 1 }}>
                           <Text style={styles.goalAllocationName}>{goal.name}</Text>
                           <Text style={styles.goalAllocationSub}>
-                            Faltan {formatMoney(remaining)}€ · {Math.round(progress)}%
+                            {t.addTransaction.goalsLeft(formatMoney(remaining), String(Math.round(progress)))}
                           </Text>
                         </View>
                       </View>
@@ -502,11 +497,11 @@ export default function AddTransactionScreen({ route, navigation }: any) {
                 })}
                 {totalAllocated > 0 && (
                   <View style={styles.allocationSummary}>
-                    <Text style={styles.allocationSummaryLabel}>Total apartado</Text>
+                    <Text style={styles.allocationSummaryLabel}>{t.addTransaction.totalAllocated}</Text>
                     <Text style={styles.allocationSummaryAmount}>{formatMoney(totalAllocated)}€</Text>
                     {amount && parseFloat(amount) > 0 && (
                       <Text style={styles.allocationRemaining}>
-                        Te quedan {formatMoney(parseFloat(amount) - totalAllocated)}€ disponibles
+                        {t.addTransaction.remaining(formatMoney(parseFloat(amount) - totalAllocated))}
                       </Text>
                     )}
                   </View>
@@ -522,14 +517,14 @@ export default function AddTransactionScreen({ route, navigation }: any) {
             disabled={loading || converting}
           >
             <Text style={styles.buttonText}>
-              {loading ? 'Guardando...' : isEditing ? 'Actualizar' : 'Guardar'}
+              {loading ? t.addTransaction.saving : isEditing ? t.addTransaction.update : t.addTransaction.save}
             </Text>
           </TouchableOpacity>
 
           {isEditing && (
             <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
               <Trash2 size={18} color={Colors.negative} />
-              <Text style={styles.deleteText}>Eliminar movimiento</Text>
+              <Text style={styles.deleteText}>{t.addTransaction.deleteTransaction}</Text>
             </TouchableOpacity>
           )}
         </ScrollView>
@@ -544,9 +539,9 @@ export default function AddTransactionScreen({ route, navigation }: any) {
           <View style={styles.modalOverlay}>
             <View style={styles.modalSheet}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Seleccionar moneda</Text>
+                <Text style={styles.modalTitle}>{t.addTransaction.selectCurrency}</Text>
                 <TouchableOpacity onPress={() => setCurrencyModalVisible(false)}>
-                  <Text style={styles.modalClose}>Cerrar</Text>
+                  <Text style={styles.modalClose}>{t.common.close}</Text>
                 </TouchableOpacity>
               </View>
               <FlatList

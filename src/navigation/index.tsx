@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Home, Users, TrendingUp, User, Plus } from 'lucide-react-native';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useColors } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import DashboardScreen from '../screens/DashboardScreen';
 import AddTransactionScreen from '../screens/AddTransactionScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -35,6 +36,7 @@ function EmptyScreen() {
 
 function MainTabs({ navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const [modalVisible, setModalVisible] = useState(false);
 
   const handleAddOption = (option: 'expense' | 'income' | 'shared' | 'recurring') => {
@@ -69,6 +71,7 @@ function MainTabs({ navigation }: any) {
           name="Inicio"
           component={DashboardScreen}
           options={{
+            tabBarLabel: t.navigation.home,
             tabBarIcon: ({ color }) => <Home size={22} color={color} />,
           }}
         />
@@ -76,6 +79,7 @@ function MainTabs({ navigation }: any) {
           name="Grupos"
           component={GroupsScreen}
           options={{
+            tabBarLabel: t.navigation.groups,
             tabBarIcon: ({ color }) => <Users size={22} color={color} />,
           }}
         />
@@ -102,6 +106,7 @@ function MainTabs({ navigation }: any) {
           name="Planifica"
           component={GoalsScreen}
           options={{
+            tabBarLabel: t.navigation.plan,
             tabBarIcon: ({ color }) => <TrendingUp size={22} color={color} />,
           }}
         />
@@ -109,6 +114,7 @@ function MainTabs({ navigation }: any) {
           name="Perfil"
           component={ProfileScreen}
           options={{
+            tabBarLabel: t.navigation.profile,
             tabBarIcon: ({ color }) => <User size={22} color={color} />,
           }}
         />

@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Edit3, Trash2 } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -22,6 +23,7 @@ type Goal = {
 
 export default function GoalDetailScreen({ route, navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const { goalId } = route.params;
   const [goal, setGoal] = useState<Goal | null>(null);
@@ -46,7 +48,7 @@ export default function GoalDetailScreen({ route, navigation }: any) {
   );
 
   const formatMoney = (value: number) => {
-    return value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return value.toLocaleString(t.goalDetail.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   const getProgress = () => {
@@ -67,14 +69,14 @@ export default function GoalDetailScreen({ route, navigation }: any) {
     const end = new Date(goal.deadline + 'T00:00:00');
     const now = new Date();
     const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    if (diff < 0) return 'Vencida';
-    if (diff === 0) return 'Último día';
-    return `${diff} días restantes`;
+    if (diff < 0) return t.goals.expired;
+    if (diff === 0) return t.goalDetail.lastDay;
+    return t.goalDetail.daysLeft(diff);
   };
 
   const handleAddMoney = async () => {
     if (!addAmount || parseFloat(addAmount) <= 0) {
-      Alert.alert('Error', 'Introduce una cantidad válida');
+      Alert.alert(t.common.error, t.goalDetail.invalidAmount);
       return;
     }
 
@@ -83,14 +85,13 @@ export default function GoalDetailScreen({ route, navigation }: any) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setSaving(false);
-      Alert.alert('Error', 'No hay sesión activa');
+      Alert.alert(t.common.error, t.goalDetail.noSession);
       return;
     }
 
     const savingsAmount = parseFloat(addAmount);
     const newAmount = Number(goal!.current_amount) + savingsAmount;
 
-    // 1. Buscar la categoría "Ahorro" del usuario
     const { data: ahorroCategory } = await supabase
       .from('categories')
       .select('id')
@@ -99,7 +100,6 @@ export default function GoalDetailScreen({ route, navigation }: any) {
       .eq('type', 'expense')
       .single();
 
-    // 2. Crear la transacción de ahorro (aparece como gasto en el saldo)
     const today = new Date().toISOString().split('T')[0];
     const { error: txError } = await supabase.from('transactions').insert({
       user_id: user.id,
@@ -116,11 +116,10 @@ export default function GoalDetailScreen({ route, navigation }: any) {
 
     if (txError) {
       setSaving(false);
-      Alert.alert('Error', txError.message);
+      Alert.alert(t.common.error, txError.message);
       return;
     }
 
-    // 3. Actualizar el current_amount de la meta
     const { error: goalError } = await supabase
       .from('goals')
       .update({ current_amount: newAmount })
@@ -129,33 +128,33 @@ export default function GoalDetailScreen({ route, navigation }: any) {
     setSaving(false);
 
     if (goalError) {
-      Alert.alert('Error', goalError.message);
+      Alert.alert(t.common.error, goalError.message);
     } else {
       setGoal({ ...goal!, current_amount: newAmount });
       setAddAmount('');
       Keyboard.dismiss();
 
       if (newAmount >= Number(goal!.target_amount)) {
-        Alert.alert('🎉 ¡Meta cumplida!', `¡Has alcanzado tu objetivo de ${formatMoney(Number(goal!.target_amount))}€!`);
+        Alert.alert(t.goalDetail.goalMet, t.goalDetail.goalMetMsg(formatMoney(Number(goal!.target_amount))));
       } else {
-        Alert.alert('💰 ¡Ahorrado!', `Llevas ${formatMoney(newAmount)}€ de ${formatMoney(Number(goal!.target_amount))}€`);
+        Alert.alert(t.goalDetail.savedAlert, t.goalDetail.savedMsg(formatMoney(newAmount), formatMoney(Number(goal!.target_amount))));
       }
     }
   };
 
   const handleDelete = () => {
     Alert.alert(
-      'Eliminar meta',
-      '¿Estás seguro? Esta acción no se puede deshacer.',
+      t.goalDetail.deleteGoal,
+      t.goalDetail.deleteGoalMsg,
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Eliminar',
+          text: t.common.delete,
           style: 'destructive',
           onPress: async () => {
             const { error } = await supabase.from('goals').delete().eq('id', goalId);
             if (error) {
-              Alert.alert('Error', error.message);
+              Alert.alert(t.common.error, error.message);
             } else {
               navigation.goBack();
             }
@@ -183,7 +182,6 @@ export default function GoalDetailScreen({ route, navigation }: any) {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView style={styles.safe}>
-        {/* HEADER */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <ChevronLeft size={28} color={Colors.textPrimary} />
@@ -201,7 +199,6 @@ export default function GoalDetailScreen({ route, navigation }: any) {
           </View>
         </View>
 
-        {/* CONTENIDO */}
         <View style={styles.container}>
           <View style={styles.titleSection}>
             <Text style={styles.emoji}>{goal.emoji || '🎯'}</Text>
@@ -210,8 +207,8 @@ export default function GoalDetailScreen({ route, navigation }: any) {
               <Text style={styles.goalDescription}>{goal.description}</Text>
             )}
             {daysLeft && (
-              <Text style={[styles.deadline, daysLeft === 'Vencida' && { color: Colors.negative }]}>
-                {daysLeft === 'Vencida' ? '⚠️ Vencida' : `⏳ ${daysLeft}`}
+              <Text style={[styles.deadline, daysLeft === t.goals.expired && { color: Colors.negative }]}>
+                {daysLeft === t.goals.expired ? `⚠️ ${t.goals.expired}` : `⏳ ${daysLeft}`}
               </Text>
             )}
           </View>
@@ -219,29 +216,29 @@ export default function GoalDetailScreen({ route, navigation }: any) {
           <View style={styles.progressSection}>
             <View style={styles.progressHeader}>
               <Text style={[styles.progressPercent, { color: progressColor }]}>{Math.round(progress)}%</Text>
-              {progress >= 100 && <Text style={styles.completedBadge}>✅ Completada</Text>}
+              {progress >= 100 && <Text style={styles.completedBadge}>{t.goalDetail.completed}</Text>}
             </View>
             <View style={styles.progressBar}>
               <View style={[styles.progressFill, { width: `${progress}%` as any, backgroundColor: progressColor }]} />
             </View>
             <View style={styles.progressFooter}>
               <View>
-                <Text style={styles.progressLabel}>Ahorrado</Text>
+                <Text style={styles.progressLabel}>{t.goalDetail.savedLabel}</Text>
                 <Text style={styles.progressValue}>{formatMoney(Number(goal.current_amount))}€</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.progressLabel}>Objetivo</Text>
+                <Text style={styles.progressLabel}>{t.goalDetail.targetLabel}</Text>
                 <Text style={styles.progressValue}>{formatMoney(Number(goal.target_amount))}€</Text>
               </View>
             </View>
             {remaining > 0 && (
-              <Text style={styles.remainingText}>Te faltan {formatMoney(remaining)}€</Text>
+              <Text style={styles.remainingText}>{t.goalDetail.remaining(formatMoney(remaining))}</Text>
             )}
           </View>
 
           {progress < 100 && (
             <View style={styles.addSection}>
-              <Text style={styles.addLabel}>Añadir ahorro</Text>
+              <Text style={styles.addLabel}>{t.goalDetail.addSaving}</Text>
               <View style={styles.addRow}>
                 <TextInput
                   style={styles.addInput}
@@ -260,7 +257,7 @@ export default function GoalDetailScreen({ route, navigation }: any) {
                   onPress={handleAddMoney}
                   disabled={saving}
                 >
-                  <Text style={styles.addButtonText}>{saving ? '...' : 'Añadir'}</Text>
+                  <Text style={styles.addButtonText}>{saving ? '...' : t.goalDetail.addBtn}</Text>
                 </TouchableOpacity>
               </View>
             </View>

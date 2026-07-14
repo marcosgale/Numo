@@ -6,29 +6,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
-const SLIDES = [
-  {
-    id: '1',
-    emoji: '💰',
-    title: 'Controla tu dinero',
-    description: 'Registra tus ingresos y gastos en segundos. Numo te muestra cuánto dinero tienes disponible de verdad.',
-  },
-  {
-    id: '2',
-    emoji: '🎯',
-    title: 'Ahorra con objetivos',
-    description: 'Crea metas de ahorro y aparta dinero cada vez que recibes un ingreso. Ve tu progreso en tiempo real.',
-  },
-  {
-    id: '3',
-    emoji: '👥',
-    title: 'Comparte gastos fácilmente',
-    description: 'Crea grupos, divide cuentas y descubre quién debe a quién. Sin complicaciones.',
-  },
-];
+const SLIDE_EMOJIS = ['💰', '🎯', '👥'];
 
 type OnboardingProps = {
   onComplete: () => void;
@@ -36,13 +18,15 @@ type OnboardingProps = {
 
 export default function OnboardingScreen({ onComplete }: OnboardingProps) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
+  const slides = t.onboarding.slides.map((s, i) => ({ id: String(i + 1), emoji: SLIDE_EMOJIS[i], ...s }));
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
 
   const handleNext = () => {
-    if (currentIndex < SLIDES.length - 1) {
+    if (currentIndex < slides.length - 1) {
       flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
     } else {
       handleFinish();
@@ -67,7 +51,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingProps) {
 
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
-  const renderSlide = ({ item }: { item: typeof SLIDES[0] }) => (
+  const renderSlide = ({ item }: { item: typeof slides[0] }) => (
     <View style={styles.slide}>
       <Text style={styles.slideEmoji}>{item.emoji}</Text>
       <Text style={styles.slideTitle}>{item.title}</Text>
@@ -75,7 +59,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingProps) {
     </View>
   );
 
-  const isLastSlide = currentIndex === SLIDES.length - 1;
+  const isLastSlide = currentIndex === slides.length - 1;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -84,7 +68,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingProps) {
         <View style={{ width: 60 }} />
         {!isLastSlide ? (
           <TouchableOpacity onPress={handleSkip}>
-            <Text style={styles.skipText}>Saltar</Text>
+            <Text style={styles.skipText}>{t.onboarding.skip}</Text>
           </TouchableOpacity>
         ) : (
           <View style={{ width: 60 }} />
@@ -94,7 +78,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingProps) {
       {/* SLIDES */}
       <FlatList
         ref={flatListRef}
-        data={SLIDES}
+        data={slides}
         renderItem={renderSlide}
         keyExtractor={(item) => item.id}
         horizontal
@@ -112,7 +96,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingProps) {
       {/* DOTS + BOTÓN */}
       <View style={styles.footer}>
         <View style={styles.dots}>
-          {SLIDES.map((_, index) => {
+          {slides.map((_, index) => {
             const inputRange = [
               (index - 1) * width,
               index * width,
@@ -145,7 +129,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingProps) {
 
         <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
           <Text style={styles.nextButtonText}>
-            {isLastSlide ? 'Empezar' : 'Siguiente'}
+            {isLastSlide ? t.onboarding.start : t.onboarding.next}
           </Text>
         </TouchableOpacity>
       </View>

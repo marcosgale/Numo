@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 
 const CURRENCIES = [
@@ -22,6 +23,7 @@ const CURRENCIES = [
 
 export default function EditProfileScreen({ navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -52,11 +54,11 @@ export default function EditProfileScreen({ navigation }: any) {
 
   const handleSave = async () => {
     if (!firstName.trim()) {
-      Alert.alert('Error', 'Introduce tu nombre');
+      Alert.alert(t.common.error, t.editProfile.errors.noName);
       return;
     }
     if (!lastName.trim()) {
-      Alert.alert('Error', 'Introduce tu apellido');
+      Alert.alert(t.common.error, t.editProfile.errors.noLastName);
       return;
     }
 
@@ -80,10 +82,10 @@ export default function EditProfileScreen({ navigation }: any) {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert(t.common.error, error.message);
     } else {
-      Alert.alert('¡Perfil actualizado!', '', [
-        { text: 'OK', onPress: () => navigation.goBack() },
+      Alert.alert(t.editProfile.success, '', [
+        { text: t.common.ok, onPress: () => navigation.goBack() },
       ]);
     }
   };
@@ -97,7 +99,7 @@ export default function EditProfileScreen({ navigation }: any) {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <ChevronLeft size={28} color={Colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Editar perfil</Text>
+          <Text style={styles.headerTitle}>{t.editProfile.title}</Text>
           <View style={{ width: 28 }} />
         </View>
 
@@ -107,10 +109,10 @@ export default function EditProfileScreen({ navigation }: any) {
         >
           {/* NOMBRE */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Nombre</Text>
+            <Text style={styles.sectionLabel}>{t.editProfile.firstName}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Tu nombre"
+              placeholder={t.editProfile.firstNamePlaceholder}
               placeholderTextColor={Colors.textSecondary}
               value={firstName}
               onChangeText={setFirstName}
@@ -120,10 +122,10 @@ export default function EditProfileScreen({ navigation }: any) {
 
           {/* APELLIDO */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Apellido</Text>
+            <Text style={styles.sectionLabel}>{t.editProfile.lastName}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Tu apellido"
+              placeholder={t.editProfile.lastNamePlaceholder}
               placeholderTextColor={Colors.textSecondary}
               value={lastName}
               onChangeText={setLastName}
@@ -133,8 +135,8 @@ export default function EditProfileScreen({ navigation }: any) {
 
           {/* MONEDA BASE */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Moneda base</Text>
-            <Text style={styles.sectionHint}>Tu saldo y totales se mostrarán en esta moneda</Text>
+            <Text style={styles.sectionLabel}>{t.editProfile.baseCurrency}</Text>
+            <Text style={styles.sectionHint}>{t.editProfile.currencyHint}</Text>
             <View style={styles.currencyGrid}>
               {CURRENCIES.map((c) => (
                 <TouchableOpacity
@@ -169,7 +171,7 @@ export default function EditProfileScreen({ navigation }: any) {
             disabled={loading}
           >
             <Text style={styles.buttonText}>
-              {loading ? 'Guardando...' : 'Guardar cambios'}
+              {loading ? t.editProfile.saving : t.editProfile.save}
             </Text>
           </TouchableOpacity>
         </ScrollView>

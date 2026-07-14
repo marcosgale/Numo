@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 
 type Transaction = {
@@ -26,15 +27,9 @@ type Transaction = {
   } | null;
 };
 
-const FILTERS = [
-  { value: 'all', label: 'Todos' },
-  { value: 'expense', label: 'Gastos' },
-  { value: 'income', label: 'Ingresos' },
-  { value: 'recurring', label: 'Recurrentes' },
-];
-
 export default function HistoryScreen({ navigation }: any) {
   const Colors = useColors();
+  const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filter, setFilter] = useState('all');
@@ -78,10 +73,10 @@ export default function HistoryScreen({ navigation }: any) {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) return 'Hoy';
-    if (date.toDateString() === yesterday.toDateString()) return 'Ayer';
+    if (date.toDateString() === today.toDateString()) return t.common.today;
+    if (date.toDateString() === yesterday.toDateString()) return t.common.yesterday;
 
-    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString(t.history.locale, { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   // Agrupar por fecha
@@ -114,7 +109,7 @@ export default function HistoryScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ChevronLeft size={28} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Historial</Text>
+        <Text style={styles.headerTitle}>{t.history.title}</Text>
         <View style={{ width: 28 }} />
       </View>
 
@@ -124,7 +119,7 @@ export default function HistoryScreen({ navigation }: any) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterRow}
       >
-        {FILTERS.map((f) => (
+        {t.history.filters.map((f) => (
           <TouchableOpacity
             key={f.value}
             style={[styles.filterChip, filter === f.value && styles.filterChipActive]}
@@ -164,10 +159,10 @@ export default function HistoryScreen({ navigation }: any) {
                         </View>
                         <View style={styles.txInfo}>
                           <Text style={styles.txName}>
-                            {tx.description || tx.categories?.name || 'Sin concepto'}
+                            {tx.description || tx.categories?.name || t.history.noConcept}
                           </Text>
                           <Text style={styles.txCategory}>
-                            {isGroup ? 'Gasto compartido' : (tx.categories?.name || 'Sin categoría')}
+                            {isGroup ? t.history.sharedExpense : (tx.categories?.name || t.history.noCategory)}
                             {tx.is_recurring ? ' · 🔄' : ''}
                           </Text>
                         </View>
@@ -188,9 +183,9 @@ export default function HistoryScreen({ navigation }: any) {
       ) : (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>📭</Text>
-          <Text style={styles.emptyText}>No hay movimientos</Text>
+          <Text style={styles.emptyText}>{t.history.noMovements}</Text>
           <Text style={styles.emptySub}>
-            {filter !== 'all' ? 'Prueba con otro filtro' : 'Aún no has registrado ningún movimiento'}
+            {filter !== 'all' ? t.history.tryAnotherFilter : t.history.noMovementsSub}
           </Text>
         </View>
       )}

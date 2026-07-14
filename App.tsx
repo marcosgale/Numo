@@ -8,6 +8,7 @@ import Navigation from './src/navigation';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import { ThemeProvider } from './src/contexts/ThemeContext';
+import { LanguageProvider } from './src/contexts/LanguageContext';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -40,18 +41,22 @@ export default function App() {
   if (showOnboarding) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <ThemeProvider>
-          <OnboardingScreen onComplete={() => setShowOnboarding(false)} />
-        </ThemeProvider>
+        <LanguageProvider>
+          <ThemeProvider>
+            <OnboardingScreen onComplete={() => setShowOnboarding(false)} />
+          </ThemeProvider>
+        </LanguageProvider>
       </GestureHandlerRootView>
     );
   }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        {session ? <Navigation /> : <AuthNavigator />}
-      </ThemeProvider>
+      <LanguageProvider>
+        <ThemeProvider>
+          {session ? <Navigation /> : <AuthNavigator />}
+        </ThemeProvider>
+      </LanguageProvider>
     </GestureHandlerRootView>
   );
 }

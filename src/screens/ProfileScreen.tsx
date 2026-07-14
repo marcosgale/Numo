@@ -5,10 +5,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   LogOut, ChevronRight, User, Tag, Bell, Shield,
-  CircleHelp, Sun, Moon, Smartphone
+  CircleHelp, Sun, Moon, Smartphone, Globe
 } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
@@ -21,17 +22,18 @@ type Profile = {
 
 type ThemePreference = 'system' | 'light' | 'dark';
 
-const THEME_OPTIONS: { value: ThemePreference; label: string; Icon: any }[] = [
-  { value: 'light', label: 'Claro', Icon: Sun },
-  { value: 'dark', label: 'Oscuro', Icon: Moon },
-  { value: 'system', label: 'Sistema', Icon: Smartphone },
-];
-
 export default function ProfileScreen() {
   const Colors = useColors();
+  const { t, language, setLanguage } = useLanguage();
   const styles = makeStyles(Colors);
   const { theme, setTheme } = useTheme();
   const navigation = useNavigation<any>();
+
+  const THEME_OPTIONS: { value: ThemePreference; label: string; Icon: any }[] = [
+    { value: 'light', label: t.profile.light, Icon: Sun },
+    { value: 'dark', label: t.profile.dark, Icon: Moon },
+    { value: 'system', label: t.profile.system, Icon: Smartphone },
+  ];
   const [profile, setProfile] = useState<Profile | null>(null);
   const [email, setEmail] = useState('');
 
@@ -54,15 +56,11 @@ export default function ProfileScreen() {
 
   const handleLogout = () => {
     Alert.alert(
-      'Cerrar sesión',
-      '¿Estás seguro de que quieres salir?',
+      t.profile.logoutTitle,
+      t.profile.logoutMsg,
       [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Cerrar sesión',
-          style: 'destructive',
-          onPress: async () => { await supabase.auth.signOut(); },
-        },
+        { text: t.common.cancel, style: 'cancel' },
+        { text: t.profile.logout, style: 'destructive', onPress: async () => { await supabase.auth.signOut(); } },
       ]
     );
   };
@@ -73,17 +71,17 @@ export default function ProfileScreen() {
   };
 
   const MENU = [
-    { icon: User, label: 'Editar perfil', onPress: () => navigation.navigate('EditProfile') },
-    { icon: Tag, label: 'Categorías', onPress: () => navigation.navigate('Categories') },
-    { icon: Bell, label: 'Notificaciones', onPress: () => navigation.navigate('Notifications') },
-    { icon: Shield, label: 'Privacidad y seguridad', onPress: () => navigation.navigate('Privacy') },
-    { icon: CircleHelp, label: 'Ayuda', onPress: () => navigation.navigate('Help') },
+    { icon: User, label: t.profile.editProfile, onPress: () => navigation.navigate('EditProfile') },
+    { icon: Tag, label: t.profile.categories, onPress: () => navigation.navigate('Categories') },
+    { icon: Bell, label: t.profile.notifications, onPress: () => navigation.navigate('Notifications') },
+    { icon: Shield, label: t.profile.privacy, onPress: () => navigation.navigate('Privacy') },
+    { icon: CircleHelp, label: t.profile.help, onPress: () => navigation.navigate('Help') },
   ];
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.pageTitle}>Perfil</Text>
+        <Text style={styles.pageTitle}>{t.profile.title}</Text>
 
         {/* AVATAR */}
         <View style={styles.avatarSection}>
@@ -99,8 +97,29 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* LANGUAGE */}
+        <Text style={styles.sectionLabel}>{t.profile.language}</Text>
+        <View style={[styles.themeCard, { marginBottom: Spacing.lg }]}>
+          {(['es', 'en'] as const).map((lang) => {
+            const isActive = language === lang;
+            return (
+              <TouchableOpacity
+                key={lang}
+                style={[styles.themeOption, isActive && styles.themeOptionActive]}
+                onPress={() => setLanguage(lang)}
+                activeOpacity={0.7}
+              >
+                <Globe size={18} color={isActive ? Colors.primary : Colors.textSecondary} style={{ marginBottom: 4 }} />
+                <Text style={[styles.themeLabel, isActive && styles.themeLabelActive]}>
+                  {lang === 'es' ? 'Español' : 'English'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         {/* DARK MODE */}
-        <Text style={styles.sectionLabel}>Apariencia</Text>
+        <Text style={styles.sectionLabel}>{t.profile.appearance}</Text>
         <View style={styles.themeCard}>
           {THEME_OPTIONS.map(({ value, label, Icon }) => {
             const isActive = theme === value;
@@ -125,7 +144,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* MENÚ */}
-        <Text style={styles.sectionLabel}>Ajustes</Text>
+        <Text style={styles.sectionLabel}>{t.profile.settings}</Text>
         <View style={styles.menuCard}>
           {MENU.map(({ icon: Icon, label, onPress }, i) => (
             <TouchableOpacity
@@ -146,10 +165,10 @@ export default function ProfileScreen() {
         {/* LOGOUT */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <LogOut size={18} color={Colors.negative} />
-          <Text style={styles.logoutText}>Cerrar sesión</Text>
+          <Text style={styles.logoutText}>{t.profile.logout}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Numo v1.0.0</Text>
+        <Text style={styles.version}>{t.profile.version}</Text>
         <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
