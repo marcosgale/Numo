@@ -25,6 +25,7 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import PrivacyScreen from '../screens/PrivacyScreen';
 import HelpScreen from '../screens/HelpScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import PlannerScreen from '../screens/PlannerScreen';
 import AddButton from '../components/AddButton';
 
 const Tab = createBottomTabNavigator();
@@ -208,6 +209,11 @@ export default function Navigation() {
         <Stack.Screen
           name="Help"
           component={HelpScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Planner"
+          component={PlannerScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>

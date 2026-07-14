@@ -301,60 +301,84 @@ export default function GoalsScreen() {
           {/* ======= LÍMITES ======= */}
           {tab === 'limits' && (
             limits.length > 0 ? (
-              limits.map(limit => {
-                const catSpent = spent[limit.categories.id] || 0;
-                const pct = Math.min((catSpent / Number(limit.amount)) * 100, 100);
-                const barColor = getLimitColor(pct);
-                const isOver = catSpent > Number(limit.amount);
-
-                return (
-                  <View key={limit.id} style={styles.limitCard}>
-                    <View style={styles.limitHeader}>
-                      <View style={[styles.limitIcon, { backgroundColor: limit.categories.color + '15' }]}>
-                        <Text style={{ fontSize: 20 }}>{limit.categories.icon}</Text>
-                      </View>
-                      <View style={styles.limitInfo}>
-                        <Text style={styles.limitName}>{limit.categories.name}</Text>
-                        <Text style={styles.limitPeriod}>{getPeriodLabel(limit.period)}</Text>
-                      </View>
-                      <TouchableOpacity onPress={() => handleDeleteLimit(limit.id, limit.categories.name)}>
-                        <Trash2 size={18} color={Colors.textSecondary} />
-                      </TouchableOpacity>
+              <>
+                {/* Plan banner */}
+                <TouchableOpacity
+                  style={styles.planBanner}
+                  onPress={() => navigation.navigate('Planner')}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.planBannerLeft}>
+                    <Text style={styles.planBannerIcon}>📋</Text>
+                    <View>
+                      <Text style={styles.planBannerTitle}>{t.planner.createPlan}</Text>
+                      <Text style={styles.planBannerSub}>{t.planner.createPlanSub}</Text>
                     </View>
-
-                    <View style={styles.progressBar}>
-                      <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
-                    </View>
-
-                    <View style={styles.limitFooter}>
-                      <Text style={[styles.limitSpent, isOver && { color: Colors.negative }]}>
-                        {formatMoney(catSpent)}€
-                      </Text>
-                      <Text style={styles.limitTotal}>{t.goals.of} {formatMoney(Number(limit.amount))}€</Text>
-                    </View>
-
-                    {isOver && (
-                      <View style={styles.overBadge}>
-                        <Text style={styles.overText}>
-                          {t.goals.exceeded(formatMoney(catSpent - Number(limit.amount)))}
-                        </Text>
-                      </View>
-                    )}
-                    {pct >= 80 && !isOver && (
-                      <View style={styles.warningBadge}>
-                        <Text style={styles.warningText}>{t.goals.nearLimit(String(Math.round(pct)))}</Text>
-                      </View>
-                    )}
                   </View>
-                );
-              })
+                  <Text style={styles.planBannerArrow}>→</Text>
+                </TouchableOpacity>
+
+                {limits.map(limit => {
+                  const catSpent = spent[limit.categories.id] || 0;
+                  const pct = Math.min((catSpent / Number(limit.amount)) * 100, 100);
+                  const barColor = getLimitColor(pct);
+                  const isOver = catSpent > Number(limit.amount);
+
+                  return (
+                    <View key={limit.id} style={styles.limitCard}>
+                      <View style={styles.limitHeader}>
+                        <View style={[styles.limitIcon, { backgroundColor: limit.categories.color + '15' }]}>
+                          <Text style={{ fontSize: 20 }}>{limit.categories.icon}</Text>
+                        </View>
+                        <View style={styles.limitInfo}>
+                          <Text style={styles.limitName}>{limit.categories.name}</Text>
+                          <Text style={styles.limitPeriod}>{getPeriodLabel(limit.period)}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => handleDeleteLimit(limit.id, limit.categories.name)}>
+                          <Trash2 size={18} color={Colors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={styles.progressBar}>
+                        <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
+                      </View>
+
+                      <View style={styles.limitFooter}>
+                        <Text style={[styles.limitSpent, isOver && { color: Colors.negative }]}>
+                          {formatMoney(catSpent)}€
+                        </Text>
+                        <Text style={styles.limitTotal}>{t.goals.of} {formatMoney(Number(limit.amount))}€</Text>
+                      </View>
+
+                      {isOver && (
+                        <View style={styles.overBadge}>
+                          <Text style={styles.overText}>
+                            {t.goals.exceeded(formatMoney(catSpent - Number(limit.amount)))}
+                          </Text>
+                        </View>
+                      )}
+                      {pct >= 80 && !isOver && (
+                        <View style={styles.warningBadge}>
+                          <Text style={styles.warningText}>{t.goals.nearLimit(String(Math.round(pct)))}</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </>
             ) : (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyEmoji}>📊</Text>
                 <Text style={styles.emptyTitle}>{t.goals.emptyLimitTitle}</Text>
                 <Text style={styles.emptySub}>{t.goals.emptyLimitSub}</Text>
-                <TouchableOpacity style={styles.emptyButton} onPress={() => navigation.navigate('AddLimit')}>
-                  <Text style={styles.emptyButtonText}>{t.goals.createLimit}</Text>
+                <TouchableOpacity style={styles.emptyButton} onPress={() => navigation.navigate('Planner')}>
+                  <Text style={styles.emptyButtonText}>{t.planner.createPlan}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.emptyButtonSecondary}
+                  onPress={() => navigation.navigate('AddLimit')}
+                >
+                  <Text style={styles.emptyButtonSecondaryText}>{t.planner.createIndividual}</Text>
                 </TouchableOpacity>
               </View>
             )
@@ -456,6 +480,29 @@ const makeStyles = (Colors: any) => StyleSheet.create({
   emptyButton: {
     backgroundColor: Colors.primary, borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
+    marginBottom: Spacing.sm,
   },
   emptyButtonText: { color: '#fff', fontSize: FontSize.md, fontWeight: '700' },
+  emptyButtonSecondary: {
+    borderWidth: 1.5, borderColor: Colors.border, borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
+  },
+  emptyButtonSecondaryText: { color: Colors.textSecondary, fontSize: FontSize.md, fontWeight: '600' },
+
+  planBanner: {
+    backgroundColor: Colors.primary + '12',
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1.5,
+    borderColor: Colors.primary + '30',
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  planBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 },
+  planBannerIcon: { fontSize: 24 },
+  planBannerTitle: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary },
+  planBannerSub: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 1 },
+  planBannerArrow: { fontSize: FontSize.lg, color: Colors.primary, fontWeight: '700' },
 });
