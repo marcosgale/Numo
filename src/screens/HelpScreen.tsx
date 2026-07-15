@@ -47,10 +47,7 @@ export default function HelpScreen({ navigation }: any) {
 
         <View style={styles.contactCard}>
           <Text style={styles.contactTitle}>{t.help.contactTitle}</Text>
-          <Text style={styles.contactText}>
-            {t.help.contactText}{' '}
-            <Text style={styles.contactEmail}>marcosgl2705@gmail.com</Text>
-          </Text>
+          <Text style={styles.contactText}>{t.help.contactText}</Text>
         </View>
 
         <View style={{ height: 40 }} />

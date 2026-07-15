@@ -170,6 +170,41 @@ export default function GoalsScreen() {
     ]);
   };
 
+  const handleDeleteGoal = (goalId: string, goalName: string) => {
+    Alert.alert(
+      t.goals.deleteGoalTitle,
+      t.goals.deleteGoalMsg(goalName),
+      [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: t.common.delete, style: 'destructive',
+          onPress: async () => {
+            await supabase.from('goals').delete().eq('id', goalId);
+            setGoals(prev => prev.filter(g => g.id !== goalId));
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAllLimits = () => {
+    Alert.alert(
+      t.goals.deleteAllLimitsTitle,
+      t.goals.deleteAllLimitsMsg,
+      [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: t.common.delete, style: 'destructive',
+          onPress: async () => {
+            const ids = limits.map(l => l.id);
+            await supabase.from('limits').delete().in('id', ids);
+            setLimits([]);
+          },
+        },
+      ]
+    );
+  };
+
   const handleDeletePlan = () => {
     Alert.alert(
       t.goals.deletePlanTitle,
@@ -383,6 +418,9 @@ export default function GoalsScreen() {
                             <Text style={styles.goalOf}> {t.common.of} {formatMoney(Number(goal.target_amount))} €</Text>
                           </View>
                         </View>
+                        <TouchableOpacity onPress={() => handleDeleteGoal(goal.id, goal.name)} hitSlop={8}>
+                          <Trash2 size={18} color={Colors.textSecondary} />
+                        </TouchableOpacity>
                       </View>
                     </TouchableOpacity>
                   );
@@ -403,7 +441,12 @@ export default function GoalsScreen() {
           {/* ══════════════════ LIMITS TAB ══════════════════ */}
           {tab === 'limits' && (
             limits.length > 0 ? (
-              limits.map(limit => {
+              <>
+              <TouchableOpacity style={styles.deleteAllRow} onPress={handleDeleteAllLimits} activeOpacity={0.7}>
+                <Trash2 size={15} color={Colors.negative} />
+                <Text style={styles.deleteAllText}>{t.goals.deleteAllLimits}</Text>
+              </TouchableOpacity>
+              {limits.map(limit => {
                 const catSpent = spent[limit.categories.id] || 0;
                 const pct = Math.min((catSpent / Number(limit.amount)) * 100, 100);
                 const barColor = getLimitColor(pct);
@@ -443,7 +486,8 @@ export default function GoalsScreen() {
                     )}
                   </View>
                 );
-              })
+              })}
+              </>
             ) : (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyEmoji}>📊</Text>
@@ -546,6 +590,12 @@ const makeStyles = (Colors: any) => StyleSheet.create({
   goalAmounts: { flexDirection: 'row', alignItems: 'baseline' },
   goalSaved: { fontSize: FontSize.md, fontWeight: '700' },
   goalOf: { fontSize: FontSize.sm, color: Colors.textSecondary },
+
+  deleteAllRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-end', paddingVertical: 6, paddingHorizontal: 4, marginBottom: 4,
+  },
+  deleteAllText: { fontSize: FontSize.xs, color: Colors.negative, fontWeight: '600' },
 
   // Limit card (shared between Plan and Limits tabs)
   limitCard: {
