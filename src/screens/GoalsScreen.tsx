@@ -26,17 +26,16 @@ type Limit = {
 };
 
 type SpentMap = { [categoryId: string]: number };
+type Tab = 'plan' | 'goals' | 'limits';
 
-function CircularProgress({
-  progress, size = 68, strokeWidth = 5, color, trackColor,
-}: {
+// ── Circular progress ─────────────────────────────────────────────────────────
+function CircularProgress({ progress, size = 68, strokeWidth = 5, color, trackColor }: {
   progress: number; size?: number; strokeWidth?: number; color: string; trackColor: string;
 }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (Math.min(progress, 100) / 100) * circumference;
   const center = size / 2;
-
   return (
     <Svg width={size} height={size}>
       <G rotation="-90" origin={`${center}, ${center}`}>
@@ -45,8 +44,7 @@ function CircularProgress({
           cx={center} cy={center} r={radius}
           stroke={color} strokeWidth={strokeWidth} fill="none"
           strokeDasharray={`${circumference} ${circumference}`}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
+          strokeDashoffset={offset} strokeLinecap="round"
         />
       </G>
       <SvgText x={center} y={center + 5} textAnchor="middle" fontSize={13} fontWeight="700" fill={color}>
@@ -56,13 +54,14 @@ function CircularProgress({
   );
 }
 
+// ── Screen ────────────────────────────────────────────────────────────────────
 export default function GoalsScreen() {
   const Colors = useColors();
   const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const navigation = useNavigation<any>();
 
-  const [tab, setTab] = useState<'goals' | 'limits'>('goals');
+  const [tab, setTab] = useState<Tab>('plan');
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loadingGoals, setLoadingGoals] = useState(true);
   const [limits, setLimits] = useState<Limit[]>([]);
@@ -94,7 +93,6 @@ export default function GoalsScreen() {
 
     const now = new Date();
     const spentMap: SpentMap = {};
-
     if (limitsData) {
       for (const limit of limitsData as any) {
         let startDate: string;
@@ -107,29 +105,24 @@ export default function GoalsScreen() {
         } else {
           startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
         }
-
         const { data: txData } = await supabase
-          .from('transactions')
-          .select('base_amount')
-          .eq('category_id', limit.categories.id)
-          .eq('type', 'expense')
-          .gte('date', startDate)
-          .is('goal_id', null);
-
+          .from('transactions').select('base_amount')
+          .eq('category_id', limit.categories.id).eq('type', 'expense')
+          .gte('date', startDate).is('goal_id', null);
         if (txData) {
           spentMap[limit.categories.id] = txData.reduce(
-            (sum: number, t: any) => sum + Number(t.base_amount), 0
+            (sum: number, tx: any) => sum + Number(tx.base_amount), 0
           );
         }
       }
     }
-
     setSpent(spentMap);
     setLoadingLimits(false);
   };
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
   const formatMoney = (value: number) =>
-    value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    value.toLocaleString(t.dashboard.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const getProgress = (current: number, target: number) =>
     target <= 0 ? 0 : Math.min((current / target) * 100, 100);
@@ -165,45 +158,77 @@ export default function GoalsScreen() {
   };
 
   const handleDeleteLimit = (limitId: string, categoryName: string) => {
+    Alert.alert(t.goals.deleteLimit, t.goals.deleteLimitMsg(categoryName), [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.common.delete, style: 'destructive',
+        onPress: async () => {
+          await supabase.from('limits').delete().eq('id', limitId);
+          setLimits(prev => prev.filter(l => l.id !== limitId));
+        },
+      },
+    ]);
+  };
+
+  const handleDeletePlan = () => {
     Alert.alert(
-      t.goals.deleteLimit,
-      t.goals.deleteLimitMsg(categoryName),
+      t.goals.deletePlanTitle,
+      t.goals.deletePlanMsg,
       [
         { text: t.common.cancel, style: 'cancel' },
         {
           text: t.common.delete, style: 'destructive',
           onPress: async () => {
-            await supabase.from('limits').delete().eq('id', limitId);
-            setLimits(prev => prev.filter(l => l.id !== limitId));
+            const ids = monthlyLimits.map(l => l.id);
+            await supabase.from('limits').delete().in('id', ids);
+            setLimits(prev => prev.filter(l => l.period !== 'monthly'));
           },
         },
       ]
     );
   };
 
-  const isLoading = tab === 'goals' ? loadingGoals : loadingLimits;
+  // ── FAB route per tab ─────────────────────────────────────────────────────
+  const getAddRoute = () => {
+    if (tab === 'plan') return 'Planner';
+    if (tab === 'goals') return 'AddGoal';
+    return 'AddLimit';
+  };
 
+  const isLoading = tab === 'goals' ? loadingGoals : (tab === 'limits' ? loadingLimits : false);
+
+  // ── Plan tab: monthly limits ───────────────────────────────────────────────
+  const monthlyLimits = limits.filter(l => l.period === 'monthly');
+  const totalMonthlyBudget = monthlyLimits.reduce((sum, l) => sum + Number(l.amount), 0);
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t.goals.title}</Text>
         <TouchableOpacity
           style={styles.addBtn}
-          onPress={() => navigation.navigate(tab === 'goals' ? 'AddGoal' : 'AddLimit')}
+          onPress={() => navigation.navigate(getAddRoute())}
         >
           <Plus size={20} color="#fff" />
         </TouchableOpacity>
       </View>
 
+      {/* 3-tab bar */}
       <View style={styles.tabsBar}>
-        {(['goals', 'limits'] as const).map(tabKey => (
+        {(['plan', 'goals', 'limits'] as Tab[]).map(tabKey => (
           <TouchableOpacity
             key={tabKey}
             style={[styles.tabItem, tab === tabKey && styles.tabItemActive]}
             onPress={() => setTab(tabKey)}
           >
             <Text style={[styles.tabText, tab === tabKey && styles.tabTextActive]}>
-              {tabKey === 'goals' ? t.goals.goalsTab : t.goals.limitsTab}
+              {tabKey === 'plan'
+                ? t.goals.planTab
+                : tabKey === 'goals'
+                  ? t.goals.goalsTab
+                  : t.goals.limitsTab}
             </Text>
           </TouchableOpacity>
         ))}
@@ -216,7 +241,93 @@ export default function GoalsScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
-          {/* ======= METAS ======= */}
+          {/* ══════════════════ PLAN TAB ══════════════════ */}
+          {tab === 'plan' && (
+            monthlyLimits.length > 0 ? (
+              <>
+                {/* Monthly budget summary card */}
+                <View style={styles.planSummaryCard}>
+                  <View style={styles.planSummaryTop}>
+                    <View>
+                      <Text style={styles.planSummaryLabel}>{t.goals.monthlyBudget}</Text>
+                      <Text style={styles.planSummaryAmount}>{formatMoney(totalMonthlyBudget)} €</Text>
+                    </View>
+                    <View style={styles.planCatBadge}>
+                      <Text style={styles.planCatNum}>{monthlyLimits.length}</Text>
+                      <Text style={styles.planCatLabel}>{t.planner.categories(monthlyLimits.length)}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.planActions}>
+                    <TouchableOpacity
+                      style={styles.editPlanBtn}
+                      onPress={() => navigation.navigate('Planner')}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.editPlanBtnText}>{t.goals.editPlan}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deletePlanBtn}
+                      onPress={handleDeletePlan}
+                      activeOpacity={0.8}
+                    >
+                      <Trash2 size={16} color="rgba(255,255,255,0.8)" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Monthly limits with progress */}
+                {monthlyLimits.map(limit => {
+                  const catSpent = spent[limit.categories.id] || 0;
+                  const pct = Math.min((catSpent / Number(limit.amount)) * 100, 100);
+                  const barColor = getLimitColor(pct);
+                  const isOver = catSpent > Number(limit.amount);
+                  return (
+                    <View key={limit.id} style={styles.limitCard}>
+                      <View style={styles.limitHeader}>
+                        <View style={[styles.limitIcon, { backgroundColor: limit.categories.color + '15' }]}>
+                          <Text style={{ fontSize: 20 }}>{limit.categories.icon}</Text>
+                        </View>
+                        <View style={styles.limitInfo}>
+                          <Text style={styles.limitName}>{limit.categories.name}</Text>
+                          <Text style={styles.limitPeriod}>{getPeriodLabel(limit.period)}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.progressBar}>
+                        <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
+                      </View>
+                      <View style={styles.limitFooter}>
+                        <Text style={[styles.limitSpent, isOver && { color: Colors.negative }]}>
+                          {formatMoney(catSpent)} €
+                        </Text>
+                        <Text style={styles.limitTotal}>{t.goals.of} {formatMoney(Number(limit.amount))} €</Text>
+                      </View>
+                      {isOver && (
+                        <View style={styles.overBadge}>
+                          <Text style={styles.overText}>{t.goals.exceeded(formatMoney(catSpent - Number(limit.amount)))}</Text>
+                        </View>
+                      )}
+                      {pct >= 80 && !isOver && (
+                        <View style={styles.warningBadge}>
+                          <Text style={styles.warningText}>{t.goals.nearLimit(String(Math.round(pct)))}</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </>
+            ) : (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyEmoji}>📋</Text>
+                <Text style={styles.emptyTitle}>{t.goals.emptyPlanTitle}</Text>
+                <Text style={styles.emptySub}>{t.goals.emptyPlanSub}</Text>
+                <TouchableOpacity style={styles.emptyButton} onPress={() => navigation.navigate('Planner')}>
+                  <Text style={styles.emptyButtonText}>{t.planner.createPlan}</Text>
+                </TouchableOpacity>
+              </View>
+            )
+          )}
+
+          {/* ══════════════════ GOALS TAB ══════════════════ */}
           {tab === 'goals' && (
             goals.length > 0 ? (
               <>
@@ -238,7 +349,7 @@ export default function GoalsScreen() {
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryItem}>
                       <Text style={[styles.summaryValue, { color: Colors.primary }]}>
-                        {formatMoney(goals.reduce((sum, g) => sum + Number(g.current_amount), 0))}€
+                        {formatMoney(goals.reduce((sum, g) => sum + Number(g.current_amount), 0))} €
                       </Text>
                       <Text style={styles.summaryLabel}>{t.goals.totalSaved}</Text>
                     </View>
@@ -249,7 +360,6 @@ export default function GoalsScreen() {
                   const progress = getProgress(Number(goal.current_amount), Number(goal.target_amount));
                   const daysLeft = getDaysLeft(goal.deadline);
                   const color = getGoalColor(progress);
-
                   return (
                     <TouchableOpacity
                       key={goal.id}
@@ -258,13 +368,7 @@ export default function GoalsScreen() {
                       activeOpacity={0.7}
                     >
                       <View style={styles.goalCardInner}>
-                        <CircularProgress
-                          progress={progress}
-                          size={68}
-                          strokeWidth={5}
-                          color={color}
-                          trackColor={Colors.border}
-                        />
+                        <CircularProgress progress={progress} size={68} strokeWidth={5} color={color} trackColor={Colors.border} />
                         <View style={styles.goalInfo}>
                           <Text style={styles.goalName} numberOfLines={1}>
                             {goal.emoji || '🎯'} {goal.name}
@@ -275,10 +379,8 @@ export default function GoalsScreen() {
                             </Text>
                           )}
                           <View style={styles.goalAmounts}>
-                            <Text style={[styles.goalSaved, { color }]}>
-                              {formatMoney(Number(goal.current_amount))}€
-                            </Text>
-                            <Text style={styles.goalOf}> {t.common.of} {formatMoney(Number(goal.target_amount))}€</Text>
+                            <Text style={[styles.goalSaved, { color }]}>{formatMoney(Number(goal.current_amount))} €</Text>
+                            <Text style={styles.goalOf}> {t.common.of} {formatMoney(Number(goal.target_amount))} €</Text>
                           </View>
                         </View>
                       </View>
@@ -298,87 +400,57 @@ export default function GoalsScreen() {
             )
           )}
 
-          {/* ======= LÍMITES ======= */}
+          {/* ══════════════════ LIMITS TAB ══════════════════ */}
           {tab === 'limits' && (
             limits.length > 0 ? (
-              <>
-                {/* Plan banner */}
-                <TouchableOpacity
-                  style={styles.planBanner}
-                  onPress={() => navigation.navigate('Planner')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.planBannerLeft}>
-                    <Text style={styles.planBannerIcon}>📋</Text>
-                    <View>
-                      <Text style={styles.planBannerTitle}>{t.planner.createPlan}</Text>
-                      <Text style={styles.planBannerSub}>{t.planner.createPlanSub}</Text>
+              limits.map(limit => {
+                const catSpent = spent[limit.categories.id] || 0;
+                const pct = Math.min((catSpent / Number(limit.amount)) * 100, 100);
+                const barColor = getLimitColor(pct);
+                const isOver = catSpent > Number(limit.amount);
+                return (
+                  <View key={limit.id} style={styles.limitCard}>
+                    <View style={styles.limitHeader}>
+                      <View style={[styles.limitIcon, { backgroundColor: limit.categories.color + '15' }]}>
+                        <Text style={{ fontSize: 20 }}>{limit.categories.icon}</Text>
+                      </View>
+                      <View style={styles.limitInfo}>
+                        <Text style={styles.limitName}>{limit.categories.name}</Text>
+                        <Text style={styles.limitPeriod}>{getPeriodLabel(limit.period)}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => handleDeleteLimit(limit.id, limit.categories.name)}>
+                        <Trash2 size={18} color={Colors.textSecondary} />
+                      </TouchableOpacity>
                     </View>
+                    <View style={styles.progressBar}>
+                      <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
+                    </View>
+                    <View style={styles.limitFooter}>
+                      <Text style={[styles.limitSpent, isOver && { color: Colors.negative }]}>
+                        {formatMoney(catSpent)} €
+                      </Text>
+                      <Text style={styles.limitTotal}>{t.goals.of} {formatMoney(Number(limit.amount))} €</Text>
+                    </View>
+                    {isOver && (
+                      <View style={styles.overBadge}>
+                        <Text style={styles.overText}>{t.goals.exceeded(formatMoney(catSpent - Number(limit.amount)))}</Text>
+                      </View>
+                    )}
+                    {pct >= 80 && !isOver && (
+                      <View style={styles.warningBadge}>
+                        <Text style={styles.warningText}>{t.goals.nearLimit(String(Math.round(pct)))}</Text>
+                      </View>
+                    )}
                   </View>
-                  <Text style={styles.planBannerArrow}>→</Text>
-                </TouchableOpacity>
-
-                {limits.map(limit => {
-                  const catSpent = spent[limit.categories.id] || 0;
-                  const pct = Math.min((catSpent / Number(limit.amount)) * 100, 100);
-                  const barColor = getLimitColor(pct);
-                  const isOver = catSpent > Number(limit.amount);
-
-                  return (
-                    <View key={limit.id} style={styles.limitCard}>
-                      <View style={styles.limitHeader}>
-                        <View style={[styles.limitIcon, { backgroundColor: limit.categories.color + '15' }]}>
-                          <Text style={{ fontSize: 20 }}>{limit.categories.icon}</Text>
-                        </View>
-                        <View style={styles.limitInfo}>
-                          <Text style={styles.limitName}>{limit.categories.name}</Text>
-                          <Text style={styles.limitPeriod}>{getPeriodLabel(limit.period)}</Text>
-                        </View>
-                        <TouchableOpacity onPress={() => handleDeleteLimit(limit.id, limit.categories.name)}>
-                          <Trash2 size={18} color={Colors.textSecondary} />
-                        </TouchableOpacity>
-                      </View>
-
-                      <View style={styles.progressBar}>
-                        <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
-                      </View>
-
-                      <View style={styles.limitFooter}>
-                        <Text style={[styles.limitSpent, isOver && { color: Colors.negative }]}>
-                          {formatMoney(catSpent)}€
-                        </Text>
-                        <Text style={styles.limitTotal}>{t.goals.of} {formatMoney(Number(limit.amount))}€</Text>
-                      </View>
-
-                      {isOver && (
-                        <View style={styles.overBadge}>
-                          <Text style={styles.overText}>
-                            {t.goals.exceeded(formatMoney(catSpent - Number(limit.amount)))}
-                          </Text>
-                        </View>
-                      )}
-                      {pct >= 80 && !isOver && (
-                        <View style={styles.warningBadge}>
-                          <Text style={styles.warningText}>{t.goals.nearLimit(String(Math.round(pct)))}</Text>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-              </>
+                );
+              })
             ) : (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyEmoji}>📊</Text>
                 <Text style={styles.emptyTitle}>{t.goals.emptyLimitTitle}</Text>
                 <Text style={styles.emptySub}>{t.goals.emptyLimitSub}</Text>
-                <TouchableOpacity style={styles.emptyButton} onPress={() => navigation.navigate('Planner')}>
-                  <Text style={styles.emptyButtonText}>{t.planner.createPlan}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.emptyButtonSecondary}
-                  onPress={() => navigation.navigate('AddLimit')}
-                >
-                  <Text style={styles.emptyButtonSecondaryText}>{t.planner.createIndividual}</Text>
+                <TouchableOpacity style={styles.emptyButton} onPress={() => navigation.navigate('AddLimit')}>
+                  <Text style={styles.emptyButtonText}>{t.goals.createLimit}</Text>
                 </TouchableOpacity>
               </View>
             )
@@ -391,6 +463,7 @@ export default function GoalsScreen() {
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const makeStyles = (Colors: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -404,6 +477,7 @@ const makeStyles = (Colors: any) => StyleSheet.create({
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
 
+  // 3-tab bar
   tabsBar: {
     flexDirection: 'row', marginHorizontal: Spacing.lg,
     backgroundColor: Colors.surface, borderRadius: BorderRadius.lg,
@@ -416,6 +490,38 @@ const makeStyles = (Colors: any) => StyleSheet.create({
 
   container: { paddingHorizontal: Spacing.lg },
 
+  // Plan tab — summary card
+  planSummaryCard: {
+    backgroundColor: Colors.primary, borderRadius: BorderRadius.lg,
+    padding: Spacing.lg, marginBottom: Spacing.md,
+    shadowColor: Colors.primary, shadowOpacity: 0.3,
+    shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4,
+  },
+  planSummaryTop: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  planSummaryLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4, fontWeight: '600', letterSpacing: 0.4 },
+  planSummaryAmount: { fontSize: 26, fontWeight: '700', color: '#fff' },
+  planCatBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 12,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, alignItems: 'center',
+  },
+  planCatNum: { fontSize: FontSize.lg, fontWeight: '700', color: '#fff' },
+  planCatLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
+  planActions: { flexDirection: 'row', gap: Spacing.sm },
+  editPlanBtn: {
+    flex: 1, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm, alignItems: 'center',
+  },
+  editPlanBtnText: { color: '#fff', fontSize: FontSize.sm, fontWeight: '700' },
+  deletePlanBtn: {
+    backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md,
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  // Goals tab — summary
   summaryCard: {
     backgroundColor: Colors.surface, borderRadius: BorderRadius.lg,
     padding: Spacing.md, marginBottom: Spacing.md,
@@ -427,6 +533,7 @@ const makeStyles = (Colors: any) => StyleSheet.create({
   summaryValue: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary },
   summaryLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
 
+  // Goal card
   goalCard: {
     backgroundColor: Colors.surface, borderRadius: BorderRadius.lg,
     padding: Spacing.md, marginBottom: Spacing.sm,
@@ -440,6 +547,7 @@ const makeStyles = (Colors: any) => StyleSheet.create({
   goalSaved: { fontSize: FontSize.md, fontWeight: '700' },
   goalOf: { fontSize: FontSize.sm, color: Colors.textSecondary },
 
+  // Limit card (shared between Plan and Limits tabs)
   limitCard: {
     backgroundColor: Colors.surface, borderRadius: BorderRadius.lg,
     padding: Spacing.md, marginBottom: Spacing.sm,
@@ -469,40 +577,18 @@ const makeStyles = (Colors: any) => StyleSheet.create({
   },
   warningText: { fontSize: FontSize.xs, color: Colors.warning, fontWeight: '500' },
 
+  // Empty state (shared)
   emptyCard: {
     backgroundColor: Colors.surface, borderRadius: BorderRadius.lg,
-    padding: Spacing.lg, alignItems: 'center', marginTop: Spacing.md,
+    padding: Spacing.xl, alignItems: 'center', marginTop: Spacing.md,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1,
   },
   emptyEmoji: { fontSize: 48, marginBottom: Spacing.sm },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: '600', color: Colors.textPrimary, marginBottom: 4 },
-  emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.lg },
+  emptyTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: 6, textAlign: 'center' },
+  emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.lg, lineHeight: 20 },
   emptyButton: {
     backgroundColor: Colors.primary, borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
-    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm,
   },
   emptyButtonText: { color: '#fff', fontSize: FontSize.md, fontWeight: '700' },
-  emptyButtonSecondary: {
-    borderWidth: 1.5, borderColor: Colors.border, borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
-  },
-  emptyButtonSecondaryText: { color: Colors.textSecondary, fontSize: FontSize.md, fontWeight: '600' },
-
-  planBanner: {
-    backgroundColor: Colors.primary + '12',
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1.5,
-    borderColor: Colors.primary + '30',
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  planBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 },
-  planBannerIcon: { fontSize: 24 },
-  planBannerTitle: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary },
-  planBannerSub: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 1 },
-  planBannerArrow: { fontSize: FontSize.lg, color: Colors.primary, fontWeight: '700' },
 });
