@@ -28,6 +28,19 @@ type Limit = {
 type SpentMap = { [categoryId: string]: number };
 type Tab = 'plan' | 'goals' | 'limits';
 
+// Maps canonical Spanish names → planner translation key
+const CANONICAL_KEY: Record<string, string> = {
+  'vivienda': 'vivienda',
+  'alimentación': 'alimentacion',
+  'transporte': 'transporte',
+  'facturas': 'facturas',
+  'ocio': 'ocio',
+  'compras': 'compras',
+  'suscripciones': 'suscripciones',
+  'salud': 'salud',
+  'ahorro': 'ahorro',
+};
+
 // ── Circular progress ─────────────────────────────────────────────────────────
 function CircularProgress({ progress, size = 68, strokeWidth = 5, color, trackColor }: {
   progress: number; size?: number; strokeWidth?: number; color: string; trackColor: string;
@@ -61,6 +74,11 @@ export default function GoalsScreen() {
   const styles = makeStyles(Colors);
   const navigation = useNavigation<any>();
 
+  const translateCatName = (name: string) => {
+    const key = CANONICAL_KEY[name.toLowerCase()];
+    return key ? ((t.planner.items as Record<string, string>)[key] ?? name) : name;
+  };
+
   const [tab, setTab] = useState<Tab>('plan');
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loadingGoals, setLoadingGoals] = useState(true);
@@ -77,16 +95,25 @@ export default function GoalsScreen() {
 
   const fetchGoals = async () => {
     setLoadingGoals(true);
-    const { data } = await supabase.from('goals').select('*').order('created_at', { ascending: false });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoadingGoals(false); return; }
+    const { data } = await supabase
+      .from('goals').select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
     if (data) setGoals(data);
     setLoadingGoals(false);
   };
 
   const fetchLimits = async () => {
     setLoadingLimits(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoadingLimits(false); return; }
+
     const { data: limitsData } = await supabase
       .from('limits')
       .select('id, amount, period, categories(id, name, icon, color)')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (limitsData) setLimits(limitsData as any);
@@ -107,8 +134,11 @@ export default function GoalsScreen() {
         }
         const { data: txData } = await supabase
           .from('transactions').select('base_amount')
-          .eq('category_id', limit.categories.id).eq('type', 'expense')
-          .gte('date', startDate).is('goal_id', null);
+          .eq('category_id', limit.categories.id)
+          .eq('type', 'expense')
+          .eq('user_id', user.id)
+          .gte('date', startDate)
+          .is('goal_id', null);
         if (txData) {
           spentMap[limit.categories.id] = txData.reduce(
             (sum: number, tx: any) => sum + Number(tx.base_amount), 0
@@ -323,7 +353,7 @@ export default function GoalsScreen() {
                           <Text style={{ fontSize: 20 }}>{limit.categories.icon}</Text>
                         </View>
                         <View style={styles.limitInfo}>
-                          <Text style={styles.limitName}>{limit.categories.name}</Text>
+                          <Text style={styles.limitName}>{translateCatName(limit.categories.name)}</Text>
                           <Text style={styles.limitPeriod}>{getPeriodLabel(limit.period)}</Text>
                         </View>
                       </View>
@@ -458,10 +488,10 @@ export default function GoalsScreen() {
                         <Text style={{ fontSize: 20 }}>{limit.categories.icon}</Text>
                       </View>
                       <View style={styles.limitInfo}>
-                        <Text style={styles.limitName}>{limit.categories.name}</Text>
+                        <Text style={styles.limitName}>{translateCatName(limit.categories.name)}</Text>
                         <Text style={styles.limitPeriod}>{getPeriodLabel(limit.period)}</Text>
                       </View>
-                      <TouchableOpacity onPress={() => handleDeleteLimit(limit.id, limit.categories.name)}>
+                      <TouchableOpacity onPress={() => handleDeleteLimit(limit.id, translateCatName(limit.categories.name))}>
                         <Trash2 size={18} color={Colors.textSecondary} />
                       </TouchableOpacity>
                     </View>

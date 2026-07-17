@@ -11,8 +11,15 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 import { useFocusEffect } from '@react-navigation/native';
 
+type Member = {
+  id: string;
+  user_id: string | null;
+  display_name: string;
+  is_claimed: boolean;
+};
+
 type Split = {
-  userId: string;
+  memberId: string;
   name: string;
   amount: number;
   is_paid: boolean;
@@ -24,20 +31,14 @@ type GroupExpense = {
   base_amount: number;
   description: string;
   date: string;
-  paid_by: string;
+  paid_by_member_id: string;
   payer_name: string;
   currency: string;
   splits: Split[];
 };
 
-type Member = {
-  user_id: string;
-  first_name: string;
-  last_name: string;
-};
-
 type MemberBalance = {
-  userId: string;
+  memberId: string;
   name: string;
   balance: number;
 };
@@ -45,14 +46,10 @@ type MemberBalance = {
 type Debt = {
   from: string;
   fromName: string;
+  fromUserId: string | null;
   to: string;
   toName: string;
-  amount: number;
-};
-
-type Settlement = {
-  from_user_id: string;
-  to_user_id: string;
+  toUserId: string | null;
   amount: number;
 };
 
@@ -69,9 +66,11 @@ export default function GroupDetailScreen({ route, navigation }: any) {
   const [memberBalances, setMemberBalances] = useState<MemberBalance[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [currentUserId, setCurrentUserId] = useState('');
+  const [currentMemberId, setCurrentMemberId] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('gastos');
   const [selectedExpense, setSelectedExpense] = useState<GroupExpense | null>(null);
+  const [settling, setSettling] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -90,24 +89,32 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
     const { data: membersData } = await supabase
       .from('group_members')
-      .select('user_id, profiles(first_name, last_name)')
+      .select('id, user_id, display_name, is_claimed')
       .eq('group_id', groupId);
 
     const memberList: Member[] = (membersData || []).map((m: any) => ({
+      id: m.id,
       user_id: m.user_id,
-      first_name: m.profiles?.first_name || '',
-      last_name: m.profiles?.last_name || '',
+      display_name: m.display_name || '',
+      is_claimed: m.is_claimed,
     }));
     setMembers(memberList);
 
+    const myMember = memberList.find(m => m.user_id === user.id);
+    const myMemberId = myMember?.id || '';
+    setCurrentMemberId(myMemberId);
+
+    // memberId → display_name map
     const memberMap: { [id: string]: string } = {};
-    memberList.forEach(m => {
-      memberMap[m.user_id] = `${m.first_name} ${m.last_name}`.trim();
-    });
+    memberList.forEach(m => { memberMap[m.id] = m.display_name; });
+
+    // memberId → user_id map (for settlements)
+    const memberUserMap: { [id: string]: string | null } = {};
+    memberList.forEach(m => { memberUserMap[m.id] = m.user_id; });
 
     const { data: expensesData } = await supabase
       .from('group_expenses')
-      .select('id, amount, base_amount, description, date, paid_by, currency')
+      .select('id, amount, base_amount, description, date, paid_by_member_id, currency')
       .eq('group_id', groupId)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false });
@@ -115,8 +122,8 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     if (!expensesData || expensesData.length === 0) {
       setExpenses([]);
       setMemberBalances(memberList.map(m => ({
-        userId: m.user_id,
-        name: memberMap[m.user_id] || '',
+        memberId: m.id,
+        name: m.display_name,
         balance: 0,
       })));
       setDebts([]);
@@ -126,75 +133,77 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
     const { data: splitsData } = await supabase
       .from('group_expense_splits')
-      .select('group_expense_id, user_id, amount, is_paid')
+      .select('group_expense_id, member_id, amount, is_paid')
       .in('group_expense_id', expensesData.map(e => e.id));
 
     const expensesWithSplits: GroupExpense[] = expensesData.map(e => ({
       ...e,
       currency: e.currency || 'EUR',
       base_amount: Number(e.base_amount ?? e.amount),
-      payer_name: memberMap[e.paid_by] || t.groupDetail.unknown,
+      payer_name: memberMap[e.paid_by_member_id] || t.groupDetail.unknown,
       splits: (splitsData || [])
         .filter(s => s.group_expense_id === e.id)
         .map(s => ({
-          userId: s.user_id,
-          name: memberMap[s.user_id] || t.groupDetail.unknown,
+          memberId: s.member_id,
+          name: memberMap[s.member_id] || t.groupDetail.unknown,
           amount: Number(s.amount),
           is_paid: s.is_paid,
         })),
     }));
     setExpenses(expensesWithSplits);
 
-    // Calcular balances
-    const balanceMap: { [userId: string]: number } = {};
-    memberList.forEach(m => { balanceMap[m.user_id] = 0; });
+    // Balance calculation keyed by member.id
+    const balanceMap: { [memberId: string]: number } = {};
+    memberList.forEach(m => { balanceMap[m.id] = 0; });
 
     for (const expense of expensesData) {
-      // base_amount está en la moneda del grupo (ya convertido al guardar)
       const expBaseAmount = Number(expense.base_amount ?? expense.amount);
-      balanceMap[expense.paid_by] = (balanceMap[expense.paid_by] || 0) + expBaseAmount;
+      if (expense.paid_by_member_id) {
+        balanceMap[expense.paid_by_member_id] = (balanceMap[expense.paid_by_member_id] || 0) + expBaseAmount;
+      }
 
       const expenseSplits = (splitsData || []).filter(s => s.group_expense_id === expense.id);
       for (const split of expenseSplits) {
-        // Convertir la parte de cada participante proporcionalmente al base_amount
         const rawTotal = Number(expense.amount);
         const splitBase = rawTotal > 0
           ? (Number(split.amount) / rawTotal) * expBaseAmount
           : Number(split.amount);
-        balanceMap[split.user_id] = (balanceMap[split.user_id] || 0) - splitBase;
+        if (split.member_id) {
+          balanceMap[split.member_id] = (balanceMap[split.member_id] || 0) - splitBase;
+        }
       }
     }
 
-    // Aplicar settlements al balance
+    // Apply settlements
     const { data: settlementsData } = await supabase
       .from('group_settlements')
-      .select('from_user_id, to_user_id, amount')
+      .select('from_member_id, to_member_id, amount')
       .eq('group_id', groupId);
 
     if (settlementsData) {
       for (const s of settlementsData) {
-        balanceMap[s.from_user_id] = (balanceMap[s.from_user_id] || 0) + Number(s.amount);
-        balanceMap[s.to_user_id] = (balanceMap[s.to_user_id] || 0) - Number(s.amount);
+        if (s.from_member_id) balanceMap[s.from_member_id] = (balanceMap[s.from_member_id] || 0) + Number(s.amount);
+        if (s.to_member_id) balanceMap[s.to_member_id] = (balanceMap[s.to_member_id] || 0) - Number(s.amount);
       }
     }
 
-    const balances: MemberBalance[] = Object.entries(balanceMap).map(([userId, balance]) => {
+    const balances: MemberBalance[] = Object.entries(balanceMap).map(([memberId, balance]) => {
       const rounded = Math.round(balance * 100) / 100;
       return {
-        userId,
-        name: memberMap[userId] || t.groupDetail.unknown,
+        memberId,
+        name: memberMap[memberId] || t.groupDetail.unknown,
         balance: Math.abs(rounded) <= 0.01 ? 0 : rounded,
       };
     });
     setMemberBalances(balances);
 
-    // Simplificar deudas
-    const debtors: { id: string; name: string; amount: number }[] = [];
-    const creditors: { id: string; name: string; amount: number }[] = [];
+    // Simplify debts
+    const debtors: { id: string; userId: string | null; name: string; amount: number }[] = [];
+    const creditors: { id: string; userId: string | null; name: string; amount: number }[] = [];
 
-    for (const { userId, name, balance } of balances) {
-      if (balance < -0.01) debtors.push({ id: userId, name, amount: Math.abs(balance) });
-      else if (balance > 0.01) creditors.push({ id: userId, name, amount: balance });
+    for (const { memberId, name, balance } of balances) {
+      if (balance < -0.01) debtors.push({ id: memberId, userId: memberUserMap[memberId] ?? null, name, amount: Math.abs(balance) });
+      else if (balance > 0.01) creditors.push({ id: memberId, userId: memberUserMap[memberId] ?? null, name, amount: balance });
     }
 
     debtors.sort((a, b) => b.amount - a.amount);
@@ -209,8 +218,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         simplifiedDebts.push({
           from: debtors[i].id,
           fromName: debtors[i].name,
+          fromUserId: debtors[i].userId,
           to: creditors[j].id,
           toName: creditors[j].name,
+          toUserId: creditors[j].userId,
           amount: Math.round(payment * 100) / 100,
         });
       }
@@ -246,6 +257,13 @@ export default function GroupDetailScreen({ route, navigation }: any) {
   const formatDateShort = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString(t.groupDetail.locale, { day: 'numeric', month: 'short' });
+  };
+
+  const displayName = (memberId: string, short = false) => {
+    if (memberId === currentMemberId) return t.groupDetail.you;
+    const member = members.find(m => m.id === memberId);
+    const name = member?.display_name || t.groupDetail.unknown;
+    return short ? name.split(' ')[0] : name;
   };
 
   const handleCopyCode = async () => {
@@ -319,17 +337,21 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         {
           text: t.common.confirm,
           onPress: async () => {
+            setSettling(true);
             const today = new Date().toISOString().split('T')[0];
 
             const { error } = await supabase.from('group_settlements').insert({
               group_id: groupId,
-              from_user_id: debt.from,
-              to_user_id: currentUserId,
+              from_member_id: debt.from,
+              to_member_id: currentMemberId,
+              from_user_id: debt.fromUserId || null,
+              to_user_id: currentUserId || null,
               amount: debt.amount,
               currency: group?.currency || 'EUR',
               date: today,
             });
 
+            setSettling(false);
             if (error) { Alert.alert(t.common.error, error.message); return; }
 
             await supabase.from('transactions').insert({
@@ -339,6 +361,50 @@ export default function GroupDetailScreen({ route, navigation }: any) {
               base_amount: debt.amount,
               currency: group?.currency || 'EUR',
               description: t.groupDetail.collectedFrom(debt.fromName.split(' ')[0]),
+              date: today,
+              is_recurring: false,
+            });
+
+            fetchData();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleIPaid = (debt: Debt) => {
+    Alert.alert(
+      t.groupDetail.confirmIPaidTitle,
+      t.groupDetail.confirmIPaidMsg(debt.toName.split(' ')[0], formatMoney(debt.amount), groupCurrencySymbol),
+      [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: t.common.confirm,
+          onPress: async () => {
+            setSettling(true);
+            const today = new Date().toISOString().split('T')[0];
+
+            const { error } = await supabase.from('group_settlements').insert({
+              group_id: groupId,
+              from_member_id: currentMemberId,
+              to_member_id: debt.to,
+              from_user_id: currentUserId || null,
+              to_user_id: debt.toUserId || null,
+              amount: debt.amount,
+              currency: group?.currency || 'EUR',
+              date: today,
+            });
+
+            setSettling(false);
+            if (error) { Alert.alert(t.common.error, error.message); return; }
+
+            await supabase.from('transactions').insert({
+              user_id: currentUserId,
+              type: 'expense',
+              amount: debt.amount,
+              base_amount: debt.amount,
+              currency: group?.currency || 'EUR',
+              description: t.groupDetail.paidTo(debt.toName.split(' ')[0]),
               date: today,
               is_recurring: false,
             });
@@ -362,7 +428,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
   const totalGroupExpenses = expenses.reduce((sum, e) => sum + Number(e.base_amount ?? e.amount), 0);
   const mySpent = expenses.reduce((sum, e) => {
-    const mySplit = e.splits.find(s => s.userId === currentUserId);
+    const mySplit = e.splits.find(s => s.memberId === currentMemberId);
     if (!mySplit) return sum;
     const rawTotal = Number(e.amount);
     const baseAmt = Number(e.base_amount ?? e.amount);
@@ -402,7 +468,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
               <View style={styles.expenseInfo}>
                 <Text style={styles.expenseName}>{exp.description}</Text>
                 <Text style={styles.expenseMeta}>
-                  {exp.paid_by === currentUserId ? t.groupDetail.you : exp.payer_name.split(' ')[0]} · {formatDateShort(exp.date)}
+                  {displayName(exp.paid_by_member_id, true)} · {formatDateShort(exp.date)}
                 </Text>
               </View>
               <Text style={styles.expenseAmount}>{formatMoney(Number(exp.amount))}{getCurrencySymbol(exp.currency)}</Text>
@@ -420,7 +486,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
   );
 
   const renderBalancesTab = () => {
-    const myBal = memberBalances.find(b => b.userId === currentUserId);
+    const myBal = memberBalances.find(b => b.memberId === currentMemberId);
 
     return (
       <>
@@ -446,12 +512,12 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
         <View style={styles.card}>
           {memberBalances.map((mb, index) => (
-            <View key={mb.userId} style={[styles.balanceRow, index < memberBalances.length - 1 && styles.border]}>
+            <View key={mb.memberId} style={[styles.balanceRow, index < memberBalances.length - 1 && styles.border]}>
               <View style={styles.memberAvatar}>
                 <Text style={styles.memberInitial}>{mb.name[0]?.toUpperCase() || '?'}</Text>
               </View>
               <Text style={styles.balanceName}>
-                {mb.userId === currentUserId ? t.groupDetail.you : mb.name.split(' ')[0]}
+                {mb.memberId === currentMemberId ? t.groupDetail.you : mb.name.split(' ')[0]}
               </Text>
               <Text style={[
                 styles.balanceAmount,
@@ -471,11 +537,11 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 <View key={index} style={[styles.debtRow, index < debts.length - 1 && styles.border]}>
                   <View style={styles.debtInfo}>
                     <Text style={styles.debtText}>
-                      {debt.to === currentUserId ? (
+                      {debt.to === currentMemberId ? (
                         <Text style={{ color: Colors.textPrimary }}>
                           {t.groupDetail.paysYou(debt.fromName.split(' ')[0])}
                         </Text>
-                      ) : debt.from === currentUserId ? (
+                      ) : debt.from === currentMemberId ? (
                         <Text style={{ color: Colors.textPrimary }}>
                           {t.groupDetail.youPay(debt.toName.split(' ')[0])}
                         </Text>
@@ -495,12 +561,21 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                       {formatMoney(debt.amount)}{groupCurrencySymbol}
                     </Text>
                   </View>
-                  {debt.to === currentUserId ? (
+                  {debt.to === currentMemberId ? (
                     <TouchableOpacity
-                      style={styles.settleBtn}
+                      style={[styles.settleBtn, settling && { opacity: 0.5 }]}
                       onPress={() => handleSettle(debt)}
+                      disabled={settling}
                     >
                       <Text style={styles.settleBtnText}>{t.groupDetail.settled}</Text>
+                    </TouchableOpacity>
+                  ) : debt.from === currentMemberId ? (
+                    <TouchableOpacity
+                      style={[styles.iPaidBtn, settling && { opacity: 0.5 }]}
+                      onPress={() => handleIPaid(debt)}
+                      disabled={settling}
+                    >
+                      <Text style={styles.iPaidBtnText}>{t.groupDetail.iPaid}</Text>
                     </TouchableOpacity>
                   ) : (
                     <Text style={[styles.debtAmount, { color: Colors.negative }]}>
@@ -520,14 +595,19 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     <>
       <View style={styles.card}>
         {members.map((m, index) => (
-          <View key={m.user_id} style={[styles.memberRow, index < members.length - 1 && styles.border]}>
-            <View style={styles.memberAvatar}>
-              <Text style={styles.memberInitial}>{m.first_name?.[0]?.toUpperCase() || '?'}</Text>
+          <View key={m.id} style={[styles.memberRow, index < members.length - 1 && styles.border]}>
+            <View style={[styles.memberAvatar, !m.is_claimed && styles.memberAvatarPending]}>
+              <Text style={styles.memberInitial}>{m.display_name?.[0]?.toUpperCase() || '?'}</Text>
             </View>
-            <Text style={styles.memberName}>
-              {m.first_name} {m.last_name}
-              {m.user_id === currentUserId ? t.groupDetail.youSuffix : ''}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.memberName}>
+                {m.display_name}
+                {m.id === currentMemberId ? t.groupDetail.youSuffix : ''}
+              </Text>
+              {!m.is_claimed && (
+                <Text style={styles.pendingLabel}>{t.groupDetail.pendingLabel}</Text>
+              )}
+            </View>
           </View>
         ))}
       </View>
@@ -556,7 +636,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ChevronLeft size={28} color={Colors.textPrimary} />
@@ -567,13 +646,16 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         </View>
         <TouchableOpacity
           style={styles.addExpenseBtn}
-          onPress={() => navigation.navigate('AddGroupExpense', { groupId, members, groupCurrency: group.currency || 'EUR' })}
+          onPress={() => navigation.navigate('AddGroupExpense', {
+            groupId,
+            members,
+            groupCurrency: group.currency || 'EUR',
+          })}
         >
           <Plus size={20} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* TABS */}
       <View style={styles.tabs}>
         {([
           { key: 'gastos' as Tab, label: t.groupDetail.tabs.expenses },
@@ -602,7 +684,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* MODAL DETALLE DE GASTO */}
+      {/* EXPENSE DETAIL MODAL */}
       <Modal
         visible={!!selectedExpense}
         transparent
@@ -621,7 +703,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 <Text style={styles.modalMetaText}>
                   {t.groupDetail.paidBy}{' '}
                   <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
-                    {selectedExpense.paid_by === currentUserId ? t.groupDetail.you.toLowerCase() : selectedExpense.payer_name.split(' ')[0]}
+                    {displayName(selectedExpense.paid_by_member_id, true)}
                   </Text>
                 </Text>
                 <Text style={styles.modalMetaText}>{formatDate(selectedExpense.date)}</Text>
@@ -638,14 +720,14 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                   <View style={styles.card}>
                     {selectedExpense.splits.map((split, i) => (
                       <View
-                        key={split.userId}
+                        key={split.memberId}
                         style={[styles.modalSplitRow, i < selectedExpense.splits.length - 1 && styles.border]}
                       >
                         <View style={styles.memberAvatar}>
                           <Text style={styles.memberInitial}>{split.name[0]?.toUpperCase() || '?'}</Text>
                         </View>
                         <Text style={styles.modalSplitName}>
-                          {split.userId === currentUserId ? t.groupDetail.you : split.name.split(' ')[0]}
+                          {displayName(split.memberId)}
                         </Text>
                         <Text style={styles.modalSplitAmount}>{formatMoney(split.amount)}{getCurrencySymbol(selectedExpense.currency)}</Text>
                       </View>
@@ -819,6 +901,13 @@ const makeStyles = (Colors: any) => StyleSheet.create({
     paddingVertical: 6,
   },
   settleBtnText: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.positive },
+  iPaidBtn: {
+    backgroundColor: Colors.primary + '15',
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+  },
+  iPaidBtnText: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.primary },
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
   memberAvatar: {
     width: 36,
@@ -829,8 +918,10 @@ const makeStyles = (Colors: any) => StyleSheet.create({
     justifyContent: 'center',
     marginRight: Spacing.sm,
   },
+  memberAvatarPending: { backgroundColor: Colors.textSecondary + '60' },
   memberInitial: { color: '#fff', fontWeight: '700', fontSize: FontSize.md },
   memberName: { fontSize: FontSize.md, color: Colors.textPrimary, fontWeight: '500' },
+  pendingLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
   codeCard: {
     backgroundColor: Colors.primary + '10',
     borderRadius: BorderRadius.lg,

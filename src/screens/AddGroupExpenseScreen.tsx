@@ -23,13 +23,14 @@ const getCurrencySymbol = (code: string) => {
 };
 
 type Member = {
-  user_id: string;
-  first_name: string;
-  last_name: string;
+  id: string;
+  user_id: string | null;
+  display_name: string;
+  is_claimed: boolean;
 };
 
 type ExpenseSplit = {
-  userId: string;
+  memberId: string;
   name: string;
   amount: number;
   is_paid: boolean;
@@ -42,9 +43,10 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
   const { groupId, members: rawMembers, expense, groupCurrency } = route.params;
 
   const members: Member[] = rawMembers.map((m: any) => ({
-    user_id: m.user_id,
-    first_name: m.first_name || m.profiles?.first_name || '',
-    last_name: m.last_name || m.profiles?.last_name || '',
+    id: m.id,
+    user_id: m.user_id ?? null,
+    display_name: m.display_name || '',
+    is_claimed: m.is_claimed ?? true,
   }));
 
   const isEditMode = !!expense;
@@ -83,13 +85,13 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
     isEditMode ? Number(expense.base_amount ?? expense.amount) : null
   );
   const [converting, setConverting] = useState(false);
-  const [paidBy, setPaidBy] = useState(isEditMode ? expense.paid_by : '');
+  const [paidBy, setPaidBy] = useState(isEditMode ? expense.paid_by_member_id : '');
   const [dateDisplay, setDateDisplay] = useState(
     isEditMode ? isoToDisplay(expense.date) : isoToDisplay(todayISO)
   );
   const [splitEqually, setSplitEqually] = useState(true);
-  const [customSplits, setCustomSplits] = useState<{ [userId: string]: string }>({});
-  const [selectedMembers, setSelectedMembers] = useState<string[]>(members.map(m => m.user_id));
+  const [customSplits, setCustomSplits] = useState<{ [memberId: string]: string }>({});
+  const [selectedMembers, setSelectedMembers] = useState<string[]>(members.map(m => m.id));
   const [currentUserId, setCurrentUserId] = useState('');
   const [loading, setLoading] = useState(false);
   const [titleError, setTitleError] = useState(false);
@@ -99,27 +101,29 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUserId(user.id);
-        if (!isEditMode) setPaidBy(user.id);
+        if (!isEditMode) {
+          const myMember = members.find(m => m.user_id === user.id);
+          if (myMember) setPaidBy(myMember.id);
+        }
       }
     };
     init();
 
     if (isEditMode && expense.splits?.length > 0) {
       const amounts = expense.splits.map((s: ExpenseSplit) => s.amount);
-      const allEqual = amounts.length > 1 &&
+      const allEqual = amounts.length >= 1 &&
         amounts.every((a: number) => Math.abs(a - amounts[0]) < 0.02);
 
       if (!allEqual) {
         setSplitEqually(false);
         const custom: { [id: string]: string } = {};
-        expense.splits.forEach((s: ExpenseSplit) => { custom[s.userId] = String(s.amount); });
+        expense.splits.forEach((s: ExpenseSplit) => { custom[s.memberId] = String(s.amount); });
         setCustomSplits(custom);
       }
-      setSelectedMembers(expense.splits.map((s: ExpenseSplit) => s.userId));
+      setSelectedMembers(expense.splits.map((s: ExpenseSplit) => s.memberId));
     }
   }, []);
 
-  // Conversión automática cuando cambia el importe o la moneda
   useEffect(() => {
     const parsedAmount = parseFloat(amount);
     if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
@@ -163,11 +167,11 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
     return cleaned;
   };
 
-  const toggleMember = (userId: string) => {
+  const toggleMember = (memberId: string) => {
     setSelectedMembers(prev =>
-      prev.includes(userId)
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId]
+      prev.includes(memberId)
+        ? prev.filter(id => id !== memberId)
+        : [...prev, memberId]
     );
   };
 
@@ -178,6 +182,34 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
 
   const formatMoney = (value: number) =>
     value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const getMemberDisplayName = (member: Member) => {
+    if (member.user_id === currentUserId) return t.groupDetail.you;
+    return member.display_name;
+  };
+
+  const buildSplits = (expenseId: string, totalAmount: number) => {
+    const n = selectedMembers.length;
+    if (n === 0) return [];
+    if (!splitEqually) {
+      return selectedMembers.map(memberId => ({
+        group_expense_id: expenseId,
+        member_id: memberId,
+        amount: parseFloat(customSplits[memberId] || '0'),
+        is_paid: memberId === paidBy,
+      }));
+    }
+    // Distribute remainder so splits always sum exactly to totalAmount
+    const totalCents = Math.round(totalAmount * 100);
+    const baseCents = Math.floor(totalCents / n);
+    const extraCents = totalCents - baseCents * n;
+    return selectedMembers.map((memberId, index) => ({
+      group_expense_id: expenseId,
+      member_id: memberId,
+      amount: (baseCents + (index < extraCents ? 1 : 0)) / 100,
+      is_paid: memberId === paidBy,
+    }));
+  };
 
   const handleSave = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -192,12 +224,12 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
       Alert.alert(t.common.error, t.addGroupExpense.errors.noPayer);
       return;
     }
-    if (selectedMembers.length < 2) {
+    if (selectedMembers.length < 1) {
       Alert.alert(t.common.error, t.addGroupExpense.errors.minParticipants);
       return;
     }
     if (!splitEqually) {
-      const total = selectedMembers.reduce((sum, uid) => sum + (parseFloat(customSplits[uid] || '0')), 0);
+      const total = selectedMembers.reduce((sum, id) => sum + (parseFloat(customSplits[id] || '0')), 0);
       const diff = Math.abs(total - parseFloat(amount));
       if (diff > 0.02) {
         Alert.alert(t.common.error, t.addGroupExpense.errors.splitMismatch(diff.toFixed(2)));
@@ -212,6 +244,9 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
     const parsedAmount = parseFloat(amount);
     const finalBaseAmount = baseAmount ?? parsedAmount;
 
+    // Resolve payer's user_id for backward compat with any DB triggers that read paid_by
+    const payerUserId = members.find(m => m.id === paidBy)?.user_id ?? null;
+
     if (isEditMode) {
       const { error: updateError } = await supabase
         .from('group_expenses')
@@ -220,7 +255,8 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
           base_amount: finalBaseAmount,
           description: description.trim(),
           date: dateISO,
-          paid_by: paidBy,
+          paid_by: payerUserId,
+          paid_by_member_id: paidBy,
           currency,
         })
         .eq('id', expense.id);
@@ -233,12 +269,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
 
       await supabase.from('group_expense_splits').delete().eq('group_expense_id', expense.id);
 
-      const splits = selectedMembers.map(userId => ({
-        group_expense_id: expense.id,
-        user_id: userId,
-        amount: splitEqually ? getEqualSplit() : parseFloat(customSplits[userId] || '0'),
-        is_paid: userId === paidBy,
-      }));
+      const splits = buildSplits(expense.id, parsedAmount);
 
       const { error: splitError } = await supabase.from('group_expense_splits').insert(splits);
       setLoading(false);
@@ -249,7 +280,8 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
         .from('group_expenses')
         .insert({
           group_id: groupId,
-          paid_by: paidBy,
+          paid_by: payerUserId,
+          paid_by_member_id: paidBy,
           amount: parsedAmount,
           base_amount: finalBaseAmount,
           description: description.trim(),
@@ -265,12 +297,7 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
         return;
       }
 
-      const splits = selectedMembers.map(userId => ({
-        group_expense_id: newExpense.id,
-        user_id: userId,
-        amount: splitEqually ? getEqualSplit() : parseFloat(customSplits[userId] || '0'),
-        is_paid: userId === paidBy,
-      }));
+      const splits = buildSplits(newExpense.id, parsedAmount);
 
       const { error: splitError } = await supabase.from('group_expense_splits').insert(splits);
       setLoading(false);
@@ -340,7 +367,6 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
               <Text style={styles.amountSymbol}>{currencySymbol}</Text>
             </View>
 
-            {/* Conversión en tiempo real */}
             {showConversion && (
               <View style={styles.conversionRow}>
                 {converting ? (
@@ -353,7 +379,6 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
               </View>
             )}
 
-            {/* Selector de moneda */}
             <View style={styles.currencyRow}>
               {CURRENCIES.map(c => {
                 const isActive = currency === c.code;
@@ -381,18 +406,19 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
             <Text style={styles.sectionLabel}>{t.addGroupExpense.whoPaid}</Text>
             <View style={styles.payerRow}>
               {members.map(m => {
-                const isSelected = paidBy === m.user_id;
-                const displayName = m.user_id === currentUserId ? t.groupDetail.you : m.first_name;
+                const isSelected = paidBy === m.id;
+                const displayName = getMemberDisplayName(m);
+                const initial = m.display_name[0]?.toUpperCase() || '?';
                 return (
                   <TouchableOpacity
-                    key={m.user_id}
+                    key={m.id}
                     style={[styles.payerChip, isSelected && styles.payerChipActive]}
-                    onPress={() => setPaidBy(m.user_id)}
+                    onPress={() => setPaidBy(m.id)}
                     activeOpacity={0.7}
                   >
                     <View style={[styles.payerAvatar, isSelected && styles.payerAvatarActive]}>
                       <Text style={[styles.payerInitial, isSelected && styles.payerInitialActive]}>
-                        {m.first_name?.[0]?.toUpperCase() || '?'}
+                        {initial}
                       </Text>
                     </View>
                     <Text style={[styles.payerName, isSelected && styles.payerNameActive]}>
@@ -434,19 +460,17 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
             <Text style={styles.sectionLabel}>{t.addGroupExpense.participants}</Text>
             <View style={styles.card}>
               {members.map((m, index) => {
-                const isSelected = selectedMembers.includes(m.user_id);
-                const displayName = m.user_id === currentUserId
-                  ? t.groupDetail.you
-                  : `${m.first_name} ${m.last_name}`.trim();
+                const isSelected = selectedMembers.includes(m.id);
+                const displayName = getMemberDisplayName(m);
 
                 return (
                   <View
-                    key={m.user_id}
+                    key={m.id}
                     style={[styles.memberRow, index < members.length - 1 && styles.borderBottom]}
                   >
                     <TouchableOpacity
                       style={styles.memberCheck}
-                      onPress={() => toggleMember(m.user_id)}
+                      onPress={() => toggleMember(m.id)}
                     >
                       <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
                         {isSelected && <Text style={styles.checkmark}>✓</Text>}
@@ -460,10 +484,10 @@ export default function AddGroupExpenseScreen({ route, navigation }: any) {
                           style={styles.splitInput}
                           placeholder="0.00"
                           placeholderTextColor={Colors.textSecondary}
-                          value={customSplits[m.user_id] || ''}
+                          value={customSplits[m.id] || ''}
                           onChangeText={(text) => {
                             const cleaned = text.replace(/[^0-9.]/g, '');
-                            setCustomSplits(prev => ({ ...prev, [m.user_id]: cleaned }));
+                            setCustomSplits(prev => ({ ...prev, [m.id]: cleaned }));
                           }}
                           keyboardType="decimal-pad"
                         />

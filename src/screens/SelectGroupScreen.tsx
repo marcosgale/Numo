@@ -73,7 +73,7 @@ export default function SelectGroupScreen({ navigation }: any) {
 
     const { data: membersData } = await supabase
       .from('group_members')
-      .select('user_id, profiles(first_name, last_name)')
+      .select('id, user_id, display_name, is_claimed')
       .eq('group_id', group.id);
 
     setSelecting(null);
@@ -84,9 +84,10 @@ export default function SelectGroupScreen({ navigation }: any) {
     }
 
     const members = membersData.map((m: any) => ({
-      user_id: m.user_id,
-      first_name: m.profiles?.first_name || '',
-      last_name: m.profiles?.last_name || '',
+      id: m.id,
+      user_id: m.user_id ?? null,
+      display_name: m.display_name || '',
+      is_claimed: m.is_claimed ?? true,
     }));
 
     navigation.replace('AddGroupExpense', {

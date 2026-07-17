@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, Keyboard, TouchableWithoutFeedback, ScrollView, Share, Platform, KeyboardAvoidingView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Copy } from 'lucide-react-native';
+import { ChevronLeft, Copy, Plus, X } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -37,9 +37,24 @@ export default function CreateGroupScreen({ navigation }: any) {
   const [emoji, setEmoji] = useState('👥');
   const [currency, setCurrency] = useState('EUR');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [memberNames, setMemberNames] = useState<string[]>(['']);
   const [loading, setLoading] = useState(false);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [createdGroupName, setCreatedGroupName] = useState('');
+
+  const inputRefs = useRef<(TextInput | null)[]>([]);
+
+  const updateMemberName = (index: number, value: string) => {
+    setMemberNames(prev => prev.map((n, i) => (i === index ? value : n)));
+  };
+
+  const addMemberSlot = () => {
+    setMemberNames(prev => [...prev, '']);
+  };
+
+  const removeMemberSlot = (index: number) => {
+    setMemberNames(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -51,6 +66,16 @@ export default function CreateGroupScreen({ navigation }: any) {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('id', user.id)
+      .single();
+
+    const creatorName = profile
+      ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+      : 'Creator';
 
     const inviteCode = generateCode();
 
@@ -74,16 +99,41 @@ export default function CreateGroupScreen({ navigation }: any) {
 
     const { error: memberError } = await supabase
       .from('group_members')
-      .insert({ group_id: group.id, user_id: user.id });
-
-    setLoading(false);
+      .insert({
+        group_id: group.id,
+        user_id: user.id,
+        display_name: creatorName,
+        is_claimed: true,
+      });
 
     if (memberError) {
+      setLoading(false);
       Alert.alert(t.common.error, memberError.message);
-    } else {
-      setCreatedGroupName(name.trim());
-      setCreatedCode(inviteCode);
+      return;
     }
+
+    const validNames = memberNames.map(n => n.trim()).filter(Boolean);
+    if (validNames.length > 0) {
+      const { error: placeholderError } = await supabase
+        .from('group_members')
+        .insert(
+          validNames.map(displayName => ({
+            group_id: group.id,
+            user_id: null,
+            display_name: displayName,
+            is_claimed: false,
+          }))
+        );
+      if (placeholderError) {
+        setLoading(false);
+        Alert.alert(t.common.error, placeholderError.message);
+        return;
+      }
+    }
+
+    setLoading(false);
+    setCreatedGroupName(name.trim());
+    setCreatedCode(inviteCode);
   };
 
   const handleCopyCode = async () => {
@@ -219,6 +269,54 @@ export default function CreateGroupScreen({ navigation }: any) {
               </View>
             </View>
 
+            {/* INTEGRANTES */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>{t.createGroup.addMembers}</Text>
+              <Text style={styles.membersHint}>{t.createGroup.membersHint}</Text>
+
+              {/* Creator row (fixed) */}
+              <View style={styles.memberSlot}>
+                <View style={styles.memberSlotAvatar}>
+                  <Text style={styles.memberSlotAvatarText}>★</Text>
+                </View>
+                <Text style={styles.youLabel}>{t.createGroup.youLabel}</Text>
+              </View>
+
+              {/* Placeholder member rows */}
+              {memberNames.map((memberName, index) => (
+                <View key={index} style={styles.memberSlot}>
+                  <View style={styles.memberSlotAvatar}>
+                    <Text style={styles.memberSlotAvatarText}>
+                      {memberName.trim() ? memberName.trim()[0].toUpperCase() : '?'}
+                    </Text>
+                  </View>
+                  <TextInput
+                    ref={ref => { inputRefs.current[index] = ref; }}
+                    style={styles.memberInput}
+                    placeholder={t.createGroup.memberNamePlaceholder}
+                    placeholderTextColor={Colors.textSecondary}
+                    value={memberName}
+                    onChangeText={v => updateMemberName(index, v)}
+                    returnKeyType="next"
+                    onSubmitEditing={() => {
+                      if (index === memberNames.length - 1) addMemberSlot();
+                      else inputRefs.current[index + 1]?.focus();
+                    }}
+                  />
+                  {memberNames.length > 1 && (
+                    <TouchableOpacity onPress={() => removeMemberSlot(index)} style={styles.removeBtn}>
+                      <X size={16} color={Colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+
+              <TouchableOpacity style={styles.addMemberBtn} onPress={addMemberSlot}>
+                <Plus size={16} color={Colors.primary} />
+                <Text style={styles.addMemberText}>{t.createGroup.addMember}</Text>
+              </TouchableOpacity>
+            </View>
+
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleCreate}
@@ -316,6 +414,43 @@ const makeStyles = (Colors: any) => StyleSheet.create({
   currencySymbol: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
   currencyCode: { fontSize: 10, fontWeight: '600', color: Colors.textSecondary },
   currencyTextActive: { color: '#fff' },
+  membersHint: { fontSize: FontSize.xs, color: Colors.textSecondary, marginBottom: Spacing.sm },
+  memberSlot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    marginBottom: Spacing.xs,
+    gap: Spacing.sm,
+  },
+  memberSlotAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberSlotAvatarText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+  youLabel: { flex: 1, fontSize: FontSize.md, color: Colors.textSecondary, fontStyle: 'italic' },
+  memberInput: {
+    flex: 1,
+    fontSize: FontSize.md,
+    color: Colors.textPrimary,
+    paddingVertical: Spacing.sm,
+  },
+  removeBtn: { padding: 4 },
+  addMemberBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    marginTop: Spacing.xs,
+  },
+  addMemberText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600' },
   button: {
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.md,

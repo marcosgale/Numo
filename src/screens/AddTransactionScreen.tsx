@@ -71,42 +71,41 @@ export default function AddTransactionScreen({ route, navigation }: any) {
 
   useEffect(() => {
     const fetchData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data: cats } = await supabase
         .from('categories')
         .select('*')
         .eq('type', type)
+        .eq('user_id', user.id)
         .order('name');
       if (cats) setCategories(cats);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('currency')
-          .eq('id', user.id)
-          .single();
-        if (profile?.currency) {
-          setBaseCurrency(profile.currency);
-          if (!isEditing) {
-            const userCurrency = CURRENCIES.find(c => c.code === profile.currency);
-            if (userCurrency) setCurrency(userCurrency);
-          }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('currency')
+        .eq('id', user.id)
+        .single();
+      if (profile?.currency) {
+        setBaseCurrency(profile.currency);
+        if (!isEditing) {
+          const userCurrency = CURRENCIES.find(c => c.code === profile.currency);
+          if (userCurrency) setCurrency(userCurrency);
         }
+      }
 
-        // Cargar metas activas si es ingreso y no es edición
-        if (type === 'income' && !isEditing) {
-          const { data: goalsData } = await supabase
-            .from('goals')
-            .select('id, name, emoji, target_amount, current_amount')
-            .order('created_at', { ascending: false });
+      if (type === 'income' && !isEditing) {
+        const { data: goalsData } = await supabase
+          .from('goals')
+          .select('id, name, emoji, target_amount, current_amount')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
 
-          if (goalsData) {
-            // Solo metas no completadas
-            const active = goalsData.filter(
-              g => Number(g.current_amount) < Number(g.target_amount)
-            );
-            setGoals(active);
-          }
+        if (goalsData) {
+          setGoals(goalsData.filter(
+            g => Number(g.current_amount) < Number(g.target_amount)
+          ));
         }
       }
     };

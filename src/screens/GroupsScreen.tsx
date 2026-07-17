@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -14,6 +14,11 @@ type Group = {
   memberCount: number;
 };
 
+type UnclaimedMember = {
+  id: string;
+  display_name: string;
+};
+
 export default function GroupsScreen() {
   const Colors = useColors();
   const { t } = useLanguage();
@@ -21,9 +26,17 @@ export default function GroupsScreen() {
   const navigation = useNavigation<any>();
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Join modal
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
+
+  // Claim modal (shown when unclaimed slots exist)
+  const [claimModalVisible, setClaimModalVisible] = useState(false);
+  const [pendingGroup, setPendingGroup] = useState<{ id: string; name: string } | null>(null);
+  const [unclaimedMembers, setUnclaimedMembers] = useState<UnclaimedMember[]>([]);
+  const [claiming, setClaiming] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -92,6 +105,7 @@ export default function GroupsScreen() {
       return;
     }
 
+    // Already a member?
     const { data: existing } = await supabase
       .from('group_members')
       .select('id')
@@ -107,20 +121,85 @@ export default function GroupsScreen() {
       return;
     }
 
-    const { error } = await supabase.from('group_members').insert({
-      group_id: group.id,
-      user_id: user.id,
-    });
+    // Check for unclaimed placeholder slots
+    const { data: unclaimed } = await supabase
+      .from('group_members')
+      .select('id, display_name')
+      .eq('group_id', group.id)
+      .eq('is_claimed', false);
 
     setJoining(false);
+    setJoinModalVisible(false);
+    setJoinCode('');
+
+    if (unclaimed && unclaimed.length > 0) {
+      setPendingGroup(group);
+      setUnclaimedMembers(unclaimed);
+      setClaimModalVisible(true);
+    } else {
+      await joinGroupFresh(group.id, group.name, user.id);
+    }
+  };
+
+  const joinGroupFresh = async (groupId: string, groupName: string, userId: string) => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('id', userId)
+      .single();
+
+    const displayName = profile
+      ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+      : 'Member';
+
+    const { error } = await supabase.from('group_members').insert({
+      group_id: groupId,
+      user_id: userId,
+      display_name: displayName,
+      is_claimed: true,
+    });
 
     if (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert(t.common.error, error.message);
     } else {
-      Alert.alert(t.groups.joined, t.groups.joinedMsg(group.name), [
-        { text: 'OK', onPress: () => { setJoinModalVisible(false); setJoinCode(''); } },
-      ]);
+      Alert.alert(t.groups.joined, t.groups.joinedMsg(groupName));
     }
+  };
+
+  const handleClaimSlot = async (memberId: string) => {
+    if (!pendingGroup) return;
+    setClaiming(memberId);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setClaiming(null); return; }
+
+    const { error } = await supabase
+      .from('group_members')
+      .update({ user_id: user.id, is_claimed: true })
+      .eq('id', memberId);
+
+    setClaiming(null);
+
+    if (error) {
+      Alert.alert(t.common.error, error.message);
+    } else {
+      setClaimModalVisible(false);
+      setPendingGroup(null);
+      Alert.alert(t.groups.joined, t.groups.joinedMsg(pendingGroup.name));
+    }
+  };
+
+  const handleJoinFresh = async () => {
+    if (!pendingGroup) return;
+    setClaiming('fresh');
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setClaiming(null); return; }
+
+    setClaimModalVisible(false);
+    await joinGroupFresh(pendingGroup.id, pendingGroup.name, user.id);
+    setClaiming(null);
+    setPendingGroup(null);
   };
 
   if (loading) {
@@ -203,6 +282,7 @@ export default function GroupsScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
+      {/* JOIN MODAL */}
       <Modal
         visible={joinModalVisible}
         transparent
@@ -238,6 +318,61 @@ export default function GroupsScreen() {
                 <Text style={styles.modalJoinText}>{joining ? t.groups.joining : t.groups.join}</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* CLAIM MODAL */}
+      <Modal
+        visible={claimModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setClaimModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.claimSheet}>
+            <Text style={styles.modalTitle}>{t.groups.claimTitle}</Text>
+            <Text style={styles.modalSub}>{t.groups.claimSub}</Text>
+
+            <FlatList
+              data={unclaimedMembers}
+              keyExtractor={item => item.id}
+              style={styles.claimList}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.claimRow, claiming === item.id && { opacity: 0.6 }]}
+                  onPress={() => handleClaimSlot(item.id)}
+                  disabled={!!claiming}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.claimAvatar}>
+                    <Text style={styles.claimAvatarText}>{item.display_name[0]?.toUpperCase() || '?'}</Text>
+                  </View>
+                  <Text style={styles.claimName}>{item.display_name}</Text>
+                  {claiming === item.id ? (
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                  ) : (
+                    <Text style={styles.claimBtn}>{t.groups.claimBtn}</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: Colors.border }} />}
+            />
+
+            <TouchableOpacity
+              style={[styles.joinFreshBtn, claiming === 'fresh' && { opacity: 0.6 }]}
+              onPress={handleJoinFresh}
+              disabled={!!claiming}
+            >
+              <Text style={styles.joinFreshText}>{t.groups.joinFresh}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalCancel}
+              onPress={() => { setClaimModalVisible(false); setPendingGroup(null); }}
+            >
+              <Text style={styles.modalCancelText}>{t.common.cancel}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -322,6 +457,12 @@ const makeStyles = (Colors: any) => StyleSheet.create({
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
   },
+  claimSheet: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    maxHeight: '80%',
+  },
   modalTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
   modalSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.lg },
   codeInput: {
@@ -342,6 +483,7 @@ const makeStyles = (Colors: any) => StyleSheet.create({
     borderRadius: BorderRadius.md,
     alignItems: 'center',
     backgroundColor: Colors.border + '40',
+    marginTop: Spacing.sm,
   },
   modalCancelText: { fontSize: FontSize.md, fontWeight: '600', color: Colors.textSecondary },
   modalJoin: {
@@ -352,4 +494,31 @@ const makeStyles = (Colors: any) => StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   modalJoinText: { fontSize: FontSize.md, fontWeight: '700', color: '#fff' },
+  claimList: { maxHeight: 280, marginBottom: Spacing.sm },
+  claimRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  claimAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  claimAvatarText: { fontSize: FontSize.md, fontWeight: '700', color: Colors.primary },
+  claimName: { flex: 1, fontSize: FontSize.md, fontWeight: '500', color: Colors.textPrimary },
+  claimBtn: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary },
+  joinFreshBtn: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    marginTop: Spacing.xs,
+  },
+  joinFreshText: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.textSecondary },
 });
