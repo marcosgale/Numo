@@ -26,28 +26,47 @@ type Goal = {
 };
 
 const CURRENCIES = [
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'USD', symbol: '$', name: 'Dólar americano' },
-  { code: 'GBP', symbol: '£', name: 'Libra esterlina' },
-  { code: 'CHF', symbol: 'Fr', name: 'Franco suizo' },
-  { code: 'SEK', symbol: 'kr', name: 'Corona sueca' },
-  { code: 'DKK', symbol: 'kr', name: 'Corona danesa' },
-  { code: 'NOK', symbol: 'kr', name: 'Corona noruega' },
-  { code: 'PLN', symbol: 'zł', name: 'Złoty polaco' },
-  { code: 'CZK', symbol: 'Kč', name: 'Corona checa' },
-  { code: 'JPY', symbol: '¥', name: 'Yen japonés' },
-  { code: 'TRY', symbol: '₺', name: 'Lira turca' },
-  { code: 'MXN', symbol: '$', name: 'Peso mexicano' },
-  { code: 'BRL', symbol: 'R$', name: 'Real brasileño' },
-  { code: 'ARS', symbol: '$', name: 'Peso argentino' },
-  { code: 'COP', symbol: '$', name: 'Peso colombiano' },
-  { code: 'THB', symbol: '฿', name: 'Baht tailandés' },
+  { code: 'EUR', symbol: '€' },
+  { code: 'USD', symbol: '$' },
+  { code: 'GBP', symbol: '£' },
+  { code: 'CHF', symbol: 'Fr' },
+  { code: 'SEK', symbol: 'kr' },
+  { code: 'DKK', symbol: 'kr' },
+  { code: 'NOK', symbol: 'kr' },
+  { code: 'PLN', symbol: 'zł' },
+  { code: 'CZK', symbol: 'Kč' },
+  { code: 'JPY', symbol: '¥' },
+  { code: 'TRY', symbol: '₺' },
+  { code: 'MXN', symbol: '$' },
+  { code: 'BRL', symbol: 'R$' },
+  { code: 'ARS', symbol: '$' },
+  { code: 'COP', symbol: '$' },
+  { code: 'THB', symbol: '฿' },
 ];
+
+const CANONICAL_CAT_KEY: Record<string, string> = {
+  'vivienda': 'vivienda', 'alimentación': 'alimentacion', 'alimentacion': 'alimentacion',
+  'transporte': 'transporte', 'facturas': 'facturas', 'ocio': 'ocio',
+  'compras': 'compras', 'suscripciones': 'suscripciones', 'salud': 'salud',
+  'ahorro': 'ahorro', 'hogar': 'hogar', 'educación': 'educacion', 'educacion': 'educacion',
+  'otros': 'otros', 'restaurantes': 'restaurantes', 'ropa': 'ropa',
+  'mascota': 'mascota', 'mascotas': 'mascota', 'deporte': 'deporte',
+  'viaje': 'viaje', 'viajes': 'viaje', 'tecnología': 'tecnologia', 'tecnologia': 'tecnologia',
+};
 
 export default function AddTransactionScreen({ route, navigation }: any) {
   const Colors = useColors();
   const { t } = useLanguage();
   const styles = makeStyles(Colors);
+
+  const translateCatName = (name: string) => {
+    const key = CANONICAL_CAT_KEY[name.toLowerCase()];
+    if (!key) return name;
+    return (t.planner.items as Record<string, string>)[key] ?? name;
+  };
+
+  const getCurrencyName = (code: string) =>
+    (t.addTransaction.currencyNames as Record<string, string>)[code] ?? code;
   const { type, isRecurring, transaction } = route.params;
   const isEditing = !!transaction;
 
@@ -206,14 +225,13 @@ export default function AddTransactionScreen({ route, navigation }: any) {
 
     // Si es ingreso y hay asignaciones a metas, crear transacciones de ahorro
     if (type === 'income' && !isEditing && totalAllocated > 0) {
-      // Buscar categoría "Ahorro"
       const { data: ahorroCategory } = await supabase
         .from('categories')
         .select('id')
         .eq('user_id', user.id)
-        .eq('name', 'Ahorro')
+        .in('name', ['Ahorro', 'Savings'])
         .eq('type', 'expense')
-        .single();
+        .maybeSingle();
 
       const today = new Date().toISOString().split('T')[0];
 
@@ -231,7 +249,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
           amount: allocation,
           base_amount: allocation,
           type: 'expense',
-          description: `Ahorro → ${goalData.name}`,
+          description: t.addTransaction.savingsDescription(goalData.name),
           date: today,
           is_recurring: false,
           currency: baseCurrency,
@@ -313,9 +331,8 @@ export default function AddTransactionScreen({ route, navigation }: any) {
     return isRecurring ? t.addTransaction.newRecurring : type === 'expense' ? t.addTransaction.newExpense : t.addTransaction.newIncome;
   };
 
-  const formatMoney = (value: number) => {
-    return value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+  const formatMoney = (value: number) =>
+    value.toLocaleString(t.addTransaction.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -454,7 +471,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
                     styles.categoryName,
                     selectedCategory === cat.id && { color: cat.color, fontWeight: '700' },
                   ]}>
-                    {cat.name}
+                    {translateCatName(cat.name)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -560,7 +577,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
                     <Text style={styles.currencyRowSymbol}>{item.symbol}</Text>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.currencyRowCode}>{item.code}</Text>
-                      <Text style={styles.currencyRowName}>{item.name}</Text>
+                      <Text style={styles.currencyRowName}>{getCurrencyName(item.code)}</Text>
                     </View>
                     {currency.code === item.code && (
                       <Text style={styles.currencyCheck}>✓</Text>

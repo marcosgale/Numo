@@ -21,11 +21,27 @@ type Limit = {
 
 type SpentMap = { [categoryId: string]: number };
 
+const CANONICAL_CAT_KEY: Record<string, string> = {
+  'vivienda': 'vivienda', 'alimentación': 'alimentacion', 'alimentacion': 'alimentacion',
+  'transporte': 'transporte', 'facturas': 'facturas', 'ocio': 'ocio',
+  'compras': 'compras', 'suscripciones': 'suscripciones', 'salud': 'salud',
+  'ahorro': 'ahorro', 'hogar': 'hogar', 'educación': 'educacion', 'educacion': 'educacion',
+  'otros': 'otros', 'restaurantes': 'restaurantes', 'ropa': 'ropa',
+  'mascota': 'mascota', 'mascotas': 'mascota', 'deporte': 'deporte',
+  'viaje': 'viaje', 'viajes': 'viaje', 'tecnología': 'tecnologia', 'tecnologia': 'tecnologia',
+};
+
 export default function LimitsScreen() {
   const Colors = useColors();
   const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const navigation = useNavigation<any>();
+
+  const translateCatName = (name: string) => {
+    const key = CANONICAL_CAT_KEY[name.toLowerCase()];
+    if (!key) return name;
+    return (t.planner.items as Record<string, string>)[key] ?? name;
+  };
   const [limits, setLimits] = useState<Limit[]>([]);
   const [spent, setSpent] = useState<SpentMap>({});
   const [loading, setLoading] = useState(true);
@@ -151,10 +167,10 @@ export default function LimitsScreen() {
                       <Text style={{ fontSize: 20 }}>{limit.categories.icon}</Text>
                     </View>
                     <View style={styles.limitInfo}>
-                      <Text style={styles.limitName}>{limit.categories.name}</Text>
+                      <Text style={styles.limitName}>{translateCatName(limit.categories.name)}</Text>
                       <Text style={styles.limitPeriod}>{t.goals.periods[limit.period as keyof typeof t.goals.periods] ?? limit.period}</Text>
                     </View>
-                    <TouchableOpacity onPress={() => handleDelete(limit.id, limit.categories.name)}>
+                    <TouchableOpacity onPress={() => handleDelete(limit.id, translateCatName(limit.categories.name))}>
                       <Trash2 size={18} color={Colors.textSecondary} />
                     </TouchableOpacity>
                   </View>

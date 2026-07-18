@@ -27,10 +27,26 @@ type Transaction = {
   } | null;
 };
 
+const CANONICAL_CAT_KEY: Record<string, string> = {
+  'vivienda': 'vivienda', 'alimentación': 'alimentacion', 'alimentacion': 'alimentacion',
+  'transporte': 'transporte', 'facturas': 'facturas', 'ocio': 'ocio',
+  'compras': 'compras', 'suscripciones': 'suscripciones', 'salud': 'salud',
+  'ahorro': 'ahorro', 'hogar': 'hogar', 'educación': 'educacion', 'educacion': 'educacion',
+  'otros': 'otros', 'restaurantes': 'restaurantes', 'ropa': 'ropa',
+  'mascota': 'mascota', 'mascotas': 'mascota', 'deporte': 'deporte',
+  'viaje': 'viaje', 'viajes': 'viaje', 'tecnología': 'tecnologia', 'tecnologia': 'tecnologia',
+};
+
 export default function HistoryScreen({ navigation }: any) {
   const Colors = useColors();
   const { t } = useLanguage();
   const styles = makeStyles(Colors);
+
+  const translateCatName = (name: string) => {
+    const key = CANONICAL_CAT_KEY[name.toLowerCase()];
+    if (!key) return name;
+    return (t.planner.items as Record<string, string>)[key] ?? name;
+  };
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -51,7 +67,7 @@ export default function HistoryScreen({ navigation }: any) {
       .limit(50);
 
     if (filter === 'expense') {
-      query = query.eq('type', 'expense').eq('is_recurring', false);
+      query = query.eq('type', 'expense');
     } else if (filter === 'income') {
       query = query.eq('type', 'income');
     } else if (filter === 'recurring') {
@@ -63,9 +79,8 @@ export default function HistoryScreen({ navigation }: any) {
     setLoading(false);
   };
 
-  const formatMoney = (value: number) => {
-    return value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+  const formatMoney = (value: number) =>
+    value.toLocaleString(t.history.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
@@ -159,10 +174,10 @@ export default function HistoryScreen({ navigation }: any) {
                         </View>
                         <View style={styles.txInfo}>
                           <Text style={styles.txName}>
-                            {tx.description || tx.categories?.name || t.history.noConcept}
+                            {tx.description || (tx.categories?.name ? translateCatName(tx.categories.name) : null) || t.history.noConcept}
                           </Text>
                           <Text style={styles.txCategory}>
-                            {isGroup ? t.history.sharedExpense : (tx.categories?.name || t.history.noCategory)}
+                            {isGroup ? t.history.sharedExpense : (tx.categories?.name ? translateCatName(tx.categories.name) : t.history.noCategory)}
                             {tx.is_recurring ? ' · 🔄' : ''}
                           </Text>
                         </View>

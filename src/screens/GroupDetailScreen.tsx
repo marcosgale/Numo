@@ -242,7 +242,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
   );
 
   const formatMoney = (value: number) =>
-    value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    value.toLocaleString(t.groupDetail.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const getCurrencySymbol = (code: string) => {
     const symbols: { [key: string]: string } = { EUR: '€', USD: '$', GBP: '£', CHF: 'Fr', JPY: '¥' };

@@ -30,15 +30,13 @@ type Tab = 'plan' | 'goals' | 'limits';
 
 // Maps canonical Spanish names → planner translation key
 const CANONICAL_KEY: Record<string, string> = {
-  'vivienda': 'vivienda',
-  'alimentación': 'alimentacion',
-  'transporte': 'transporte',
-  'facturas': 'facturas',
-  'ocio': 'ocio',
-  'compras': 'compras',
-  'suscripciones': 'suscripciones',
-  'salud': 'salud',
-  'ahorro': 'ahorro',
+  'vivienda': 'vivienda', 'alimentación': 'alimentacion', 'alimentacion': 'alimentacion',
+  'transporte': 'transporte', 'facturas': 'facturas', 'ocio': 'ocio',
+  'compras': 'compras', 'suscripciones': 'suscripciones', 'salud': 'salud',
+  'ahorro': 'ahorro', 'hogar': 'hogar', 'educación': 'educacion', 'educacion': 'educacion',
+  'otros': 'otros', 'restaurantes': 'restaurantes', 'ropa': 'ropa',
+  'mascota': 'mascota', 'mascotas': 'mascota', 'deporte': 'deporte',
+  'viaje': 'viaje', 'viajes': 'viaje', 'tecnología': 'tecnologia', 'tecnologia': 'tecnologia',
 };
 
 // ── Circular progress ─────────────────────────────────────────────────────────

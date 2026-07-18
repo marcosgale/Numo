@@ -17,10 +17,26 @@ type Category = {
   color: string;
 };
 
+const CANONICAL_CAT_KEY: Record<string, string> = {
+  'vivienda': 'vivienda', 'alimentación': 'alimentacion', 'alimentacion': 'alimentacion',
+  'transporte': 'transporte', 'facturas': 'facturas', 'ocio': 'ocio',
+  'compras': 'compras', 'suscripciones': 'suscripciones', 'salud': 'salud',
+  'ahorro': 'ahorro', 'hogar': 'hogar', 'educación': 'educacion', 'educacion': 'educacion',
+  'otros': 'otros', 'restaurantes': 'restaurantes', 'ropa': 'ropa',
+  'mascota': 'mascota', 'mascotas': 'mascota', 'deporte': 'deporte',
+  'viaje': 'viaje', 'viajes': 'viaje', 'tecnología': 'tecnologia', 'tecnologia': 'tecnologia',
+};
+
 export default function AddLimitScreen({ navigation }: any) {
   const Colors = useColors();
   const { t } = useLanguage();
   const styles = makeStyles(Colors);
+
+  const translateCatName = (name: string) => {
+    const key = CANONICAL_CAT_KEY[name.toLowerCase()];
+    if (!key) return name;
+    return (t.planner.items as Record<string, string>)[key] ?? name;
+  };
   const PERIODS = t.addLimit.periods;
   const [categories, setCategories] = useState<Category[]>([]);
   const [existingLimits, setExistingLimits] = useState<string[]>([]);
@@ -135,7 +151,7 @@ export default function AddLimitScreen({ navigation }: any) {
                     styles.categoryName,
                     selectedCategory === cat.id && { color: cat.color, fontWeight: '700' },
                   ]}>
-                    {cat.name}
+                    {translateCatName(cat.name)}
                   </Text>
                 </TouchableOpacity>
               ))}

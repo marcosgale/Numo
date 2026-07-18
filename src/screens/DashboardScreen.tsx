@@ -38,11 +38,27 @@ type LimitWithSpent = {
   categories: { id: string; name: string; icon: string; color: string };
 };
 
+const CANONICAL_CAT_KEY: Record<string, string> = {
+  'vivienda': 'vivienda', 'alimentación': 'alimentacion', 'alimentacion': 'alimentacion',
+  'transporte': 'transporte', 'facturas': 'facturas', 'ocio': 'ocio',
+  'compras': 'compras', 'suscripciones': 'suscripciones', 'salud': 'salud',
+  'ahorro': 'ahorro', 'hogar': 'hogar', 'educación': 'educacion', 'educacion': 'educacion',
+  'otros': 'otros', 'restaurantes': 'restaurantes', 'ropa': 'ropa',
+  'mascota': 'mascota', 'mascotas': 'mascota', 'deporte': 'deporte',
+  'viaje': 'viaje', 'viajes': 'viaje', 'tecnología': 'tecnologia', 'tecnologia': 'tecnologia',
+};
+
 export default function DashboardScreen() {
   const Colors = useColors();
   const { t } = useLanguage();
   const styles = makeStyles(Colors);
   const navigation = useNavigation<any>();
+
+  const translateCatName = (name: string) => {
+    const key = CANONICAL_CAT_KEY[name.toLowerCase()];
+    if (!key) return name;
+    return (t.planner.items as Record<string, string>)[key] ?? name;
+  };
 
   const [firstName, setFirstName] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -86,11 +102,10 @@ export default function DashboardScreen() {
       setMonthExpenses(monthTx.filter(t => t.type === 'expense' && t.goal_id === null).reduce((s, t) => s + Number(t.base_amount), 0));
     }
 
-    // Últimos 4 movimientos (sin recurrentes ni metas)
+    // Últimos 4 movimientos (sin metas)
     const { data: recentTx } = await supabase
       .from('transactions')
       .select('id, amount, base_amount, type, description, date, is_recurring, recurrence_period, currency, category_id, goal_id, group_expense_id, categories(name, icon, color)')
-      .eq('is_recurring', false)
       .is('goal_id', null)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
@@ -153,7 +168,7 @@ export default function DashboardScreen() {
   };
 
   const formatMoney = (v: number) =>
-    v.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    v.toLocaleString(t.dashboard.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const formatDate = (d: string) => {
     const date = new Date(d + 'T00:00:00');
@@ -248,7 +263,7 @@ export default function DashboardScreen() {
                     <Text style={styles.rowEmoji}>{limit.categories.icon}</Text>
                     <View style={styles.rowBody}>
                       <View style={styles.rowTop}>
-                        <Text style={styles.rowName}>{limit.categories.name}</Text>
+                        <Text style={styles.rowName}>{translateCatName(limit.categories.name)}</Text>
                         <Text style={[styles.rowPct, { color }]}>{Math.round(pct)}%</Text>
                       </View>
                       <View style={styles.thinBar}>
@@ -330,7 +345,7 @@ export default function DashboardScreen() {
                     </View>
                     <View style={styles.txInfo}>
                       <Text style={styles.txName} numberOfLines={1}>
-                        {tx.description || tx.categories?.name || t.dashboard.noConcept}
+                        {tx.description || (tx.categories?.name ? translateCatName(tx.categories.name) : null) || t.dashboard.noConcept}
                       </Text>
                       <Text style={styles.txDate}>{formatDate(tx.date)}</Text>
                     </View>

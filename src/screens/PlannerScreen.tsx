@@ -14,15 +14,11 @@ import { supabase } from '../services/supabase';
 // `es` is the canonical name used to match/create categories in Supabase.
 // Display name comes from t.planner.items[key].
 const PLAN_DEFAULTS = [
-  { key: 'vivienda',      es: 'Vivienda',      icon: '🏠', color: '#54A0FF' },
-  { key: 'alimentacion',  es: 'Alimentación',  icon: '🍔', color: '#FF9F43' },
-  { key: 'transporte',    es: 'Transporte',    icon: '🚗', color: '#FECA57' },
-  { key: 'facturas',      es: 'Facturas',      icon: '💡', color: '#48DBFB' },
-  { key: 'ocio',          es: 'Ocio',          icon: '🎮', color: '#5F27CD' },
-  { key: 'compras',       es: 'Compras',       icon: '🛍️', color: '#FF9FF3' },
-  { key: 'suscripciones', es: 'Suscripciones', icon: '📱', color: '#576574' },
-  { key: 'salud',         es: 'Salud',         icon: '💊', color: '#1DD1A1' },
-  { key: 'ahorro',        es: 'Ahorro',        icon: '💰', color: '#1DB87A' },
+  { key: 'vivienda',     es: 'Vivienda',     icon: '🏠', color: '#54A0FF' },
+  { key: 'alimentacion', es: 'Alimentación', icon: '🍔', color: '#FF9F43' },
+  { key: 'transporte',   es: 'Transporte',   icon: '🚗', color: '#FECA57' },
+  { key: 'ocio',         es: 'Ocio',         icon: '🎮', color: '#5F27CD' },
+  { key: 'compras',      es: 'Compras',      icon: '🛍️', color: '#FF9FF3' },
 ] as const;
 
 type DefaultKey = typeof PLAN_DEFAULTS[number]['key'];
@@ -59,10 +55,26 @@ let uidCounter = 0;
 const uid = () => `plan_${++uidCounter}_${Date.now()}`;
 
 // ── Component ─────────────────────────────────────────────────────────────────
+const CANONICAL_CAT_KEY: Record<string, string> = {
+  'vivienda': 'vivienda', 'alimentación': 'alimentacion', 'alimentacion': 'alimentacion',
+  'transporte': 'transporte', 'facturas': 'facturas', 'ocio': 'ocio',
+  'compras': 'compras', 'suscripciones': 'suscripciones', 'salud': 'salud',
+  'ahorro': 'ahorro', 'hogar': 'hogar', 'educación': 'educacion', 'educacion': 'educacion',
+  'otros': 'otros', 'restaurantes': 'restaurantes', 'ropa': 'ropa',
+  'mascota': 'mascota', 'mascotas': 'mascota', 'deporte': 'deporte',
+  'viaje': 'viaje', 'viajes': 'viaje', 'tecnología': 'tecnologia', 'tecnologia': 'tecnologia',
+};
+
 export default function PlannerScreen({ navigation }: any) {
   const Colors = useColors();
   const { t } = useLanguage();
   const styles = makeStyles(Colors);
+
+  const translateCatName = (name: string) => {
+    const key = CANONICAL_CAT_KEY[name.toLowerCase()];
+    if (!key) return name;
+    return (t.planner.items as Record<string, string>)[key] ?? name;
+  };
 
   const [period, setPeriod] = useState<Period>('monthly');
   const [items, setItems] = useState<PlanItem[]>([]);
@@ -184,7 +196,7 @@ export default function PlannerScreen({ navigation }: any) {
     const newItem: PlanItem = {
       uid: uid(),
       categoryId: cat.id,
-      displayName: cat.name,
+      displayName: translateCatName(cat.name),
       canonicalName: cat.name,
       icon: cat.icon,
       color: cat.color,
@@ -468,7 +480,7 @@ export default function PlannerScreen({ navigation }: any) {
                     <View style={[styles.catIcon, { backgroundColor: cat.color + '20' }]}>
                       <Text style={{ fontSize: 18 }}>{cat.icon}</Text>
                     </View>
-                    <Text style={styles.modalCatName}>{cat.name}</Text>
+                    <Text style={styles.modalCatName}>{translateCatName(cat.name)}</Text>
                     <Plus size={18} color={Colors.primary} />
                   </TouchableOpacity>
                 ))}
