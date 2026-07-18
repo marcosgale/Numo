@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, Keyboard, TouchableWithoutFeedback, ScrollView
+  Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
@@ -31,6 +31,8 @@ export default function EditProfileScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
 
+  const lastNameRef = useRef<TextInput>(null);
+
   useEffect(() => {
     const fetchProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -53,6 +55,7 @@ export default function EditProfileScreen({ navigation }: any) {
   }, []);
 
   const handleSave = async () => {
+    Keyboard.dismiss();
     if (!firstName.trim()) {
       Alert.alert(t.common.error, t.editProfile.errors.noName);
       return;
@@ -93,19 +96,23 @@ export default function EditProfileScreen({ navigation }: any) {
   if (fetching) return null;
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <ChevronLeft size={28} color={Colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t.editProfile.title}</Text>
-          <View style={{ width: 28 }} />
-        </View>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <ChevronLeft size={28} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{t.editProfile.title}</Text>
+        <View style={{ width: 28 }} />
+      </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <ScrollView
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* NOMBRE */}
           <View style={styles.section}>
@@ -117,6 +124,9 @@ export default function EditProfileScreen({ navigation }: any) {
               value={firstName}
               onChangeText={setFirstName}
               autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={() => lastNameRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
 
@@ -124,12 +134,15 @@ export default function EditProfileScreen({ navigation }: any) {
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>{t.editProfile.lastName}</Text>
             <TextInput
+              ref={lastNameRef}
               style={styles.input}
               placeholder={t.editProfile.lastNamePlaceholder}
               placeholderTextColor={Colors.textSecondary}
               value={lastName}
               onChangeText={setLastName}
               autoCapitalize="words"
+              returnKeyType="done"
+              onSubmitEditing={handleSave}
             />
           </View>
 
@@ -175,8 +188,8 @@ export default function EditProfileScreen({ navigation }: any) {
             </Text>
           </TouchableOpacity>
         </ScrollView>
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

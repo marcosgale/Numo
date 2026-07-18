@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, Keyboard, TouchableWithoutFeedback, ScrollView, Modal, FlatList, ActivityIndicator
+  Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, Modal, FlatList, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronDown, Trash2 } from 'lucide-react-native';
@@ -335,7 +335,10 @@ export default function AddTransactionScreen({ route, navigation }: any) {
     value.toLocaleString(t.addTransaction.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <SafeAreaView style={styles.safe}>
         {/* HEADER */}
         <View style={styles.header}>
@@ -355,6 +358,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
         <ScrollView
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* IMPORTE + MONEDA */}
           <View style={styles.amountSection}>
@@ -589,7 +593,7 @@ export default function AddTransactionScreen({ route, navigation }: any) {
           </View>
         </Modal>
       </SafeAreaView>
-    </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 

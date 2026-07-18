@@ -1,5 +1,9 @@
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable } from 'react-native';
-import { Plus, X, TrendingDown, TrendingUp, Users, RefreshCw } from 'lucide-react-native';
+import { useState, useEffect, useRef } from 'react';
+import {
+  View, Text, TouchableOpacity, StyleSheet, Modal, Pressable,
+  Animated, Easing
+} from 'react-native';
+import { X, TrendingDown, TrendingUp, Users, RefreshCw } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -12,85 +16,180 @@ type AddButtonProps = {
 export default function AddButton({ visible, onClose, onSelectOption }: AddButtonProps) {
   const Colors = useColors();
   const { t } = useLanguage();
-  const styles = makeStyles(Colors);
+  const isDark = Colors.background === '#000000';
 
-  const handleSelect = (option: 'expense' | 'income' | 'shared' | 'recurring') => {
-    onClose();
-    onSelectOption(option);
+  const [internalVisible, setInternalVisible] = useState(false);
+
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const sheetTranslateY = useRef(new Animated.Value(420)).current;
+  const itemAnims = useRef(
+    Array.from({ length: 4 }, () => ({
+      opacity: new Animated.Value(0),
+      scale: new Animated.Value(0.85),
+    }))
+  ).current;
+
+  useEffect(() => {
+    if (visible) {
+      backdropOpacity.setValue(0);
+      sheetTranslateY.setValue(420);
+      itemAnims.forEach(({ opacity, scale }) => {
+        opacity.setValue(0);
+        scale.setValue(0.85);
+      });
+      setInternalVisible(true);
+
+      Animated.parallel([
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(sheetTranslateY, {
+          toValue: 0,
+          tension: 65,
+          friction: 11,
+          useNativeDriver: true,
+        }),
+        Animated.stagger(
+          70,
+          itemAnims.map(({ opacity, scale }) =>
+            Animated.parallel([
+              Animated.spring(opacity, { toValue: 1, tension: 80, friction: 10, useNativeDriver: true }),
+              Animated.spring(scale, { toValue: 1, tension: 80, friction: 10, useNativeDriver: true }),
+            ])
+          )
+        ),
+      ]).start();
+    }
+  }, [visible]);
+
+  const animateClose = (callback: () => void) => {
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetTranslateY, {
+        toValue: 420,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setInternalVisible(false);
+      callback();
+    });
   };
 
-  const isDark = Colors.background === '#000000';
+  const handleClose = () => animateClose(onClose);
+
+  const handleSelect = (option: 'expense' | 'income' | 'shared' | 'recurring') => {
+    animateClose(() => {
+      onClose();
+      onSelectOption(option);
+    });
+  };
+
+  const OPTIONS = [
+    {
+      key: 'expense' as const,
+      Icon: TrendingDown,
+      color: Colors.negative,
+      bg: isDark ? '#3A1212' : '#FFE5E5',
+      label: t.addButton.expense,
+    },
+    {
+      key: 'income' as const,
+      Icon: TrendingUp,
+      color: Colors.positive,
+      bg: isDark ? '#0A2A15' : '#E5F8EE',
+      label: t.addButton.income,
+    },
+    {
+      key: 'shared' as const,
+      Icon: Users,
+      color: '#9B59B6',
+      bg: isDark ? '#1E0A2A' : '#F0E5FF',
+      label: t.addButton.shared,
+    },
+    {
+      key: 'recurring' as const,
+      Icon: RefreshCw,
+      color: '#3498DB',
+      bg: isDark ? '#0A1A2A' : '#E5F0FF',
+      label: t.addButton.recurring,
+    },
+  ];
+
+  const styles = makeStyles(Colors);
 
   return (
     <Modal
-      visible={visible}
+      visible={internalVisible}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
+      statusBarTranslucent
     >
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.sheet}>
+      <View style={styles.container}>
+        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        </Animated.View>
+
+        <Animated.View style={[styles.sheet, { transform: [{ translateY: sheetTranslateY }] }]}>
           <View style={styles.handle} />
 
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>{t.addButton.title}</Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity onPress={handleClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <X size={24} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.grid}>
-            <TouchableOpacity
-              style={[styles.gridItem, { backgroundColor: isDark ? '#3A1212' : '#FFE5E5' }]}
-              onPress={() => handleSelect('expense')}
-            >
-              <View style={styles.iconCircle}>
-                <TrendingDown size={28} color={Colors.negative} />
-              </View>
-              <Text style={styles.gridLabel}>{t.addButton.expense}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.gridItem, { backgroundColor: isDark ? '#0A2A15' : '#E5F8EE' }]}
-              onPress={() => handleSelect('income')}
-            >
-              <View style={styles.iconCircle}>
-                <TrendingUp size={28} color={Colors.positive} />
-              </View>
-              <Text style={styles.gridLabel}>{t.addButton.income}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.gridItem, { backgroundColor: isDark ? '#1E0A2A' : '#F0E5FF' }]}
-              onPress={() => handleSelect('shared')}
-            >
-              <View style={styles.iconCircle}>
-                <Users size={28} color="#9B59B6" />
-              </View>
-              <Text style={styles.gridLabel}>{t.addButton.shared}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.gridItem, { backgroundColor: isDark ? '#0A1A2A' : '#E5F0FF' }]}
-              onPress={() => handleSelect('recurring')}
-            >
-              <View style={styles.iconCircle}>
-                <RefreshCw size={28} color="#3498DB" />
-              </View>
-              <Text style={styles.gridLabel}>{t.addButton.recurring}</Text>
-            </TouchableOpacity>
+            {OPTIONS.map(({ key, Icon, color, bg, label }, index) => (
+              <Animated.View
+                key={key}
+                style={[
+                  styles.gridItem,
+                  { backgroundColor: bg },
+                  {
+                    opacity: itemAnims[index].opacity,
+                    transform: [{ scale: itemAnims[index].scale }],
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.gridItemInner}
+                  onPress={() => handleSelect(key)}
+                  activeOpacity={0.72}
+                >
+                  <View style={styles.iconCircle}>
+                    <Icon size={28} color={color} />
+                  </View>
+                  <Text style={styles.gridLabel}>{label}</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
           </View>
-        </Pressable>
-      </Pressable>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
 
 const makeStyles = (Colors: any) => StyleSheet.create({
-  overlay: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.52)',
   },
   sheet: {
     backgroundColor: Colors.surface,
@@ -127,6 +226,10 @@ const makeStyles = (Colors: any) => StyleSheet.create({
     width: '48%',
     aspectRatio: 1,
     borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+  },
+  gridItemInner: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.md,

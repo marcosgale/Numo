@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Keyboard, TouchableWithoutFeedback, ScrollView } from 'react-native';
+import { useState, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -15,7 +15,11 @@ export default function RegisterScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [titleError, setTitleError] = useState(false);
+
+  const lastNameRef = useRef<TextInput>(null);
+  const birthDateRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const validateAge = (dateString: string): boolean => {
     const parts = dateString.split('/');
@@ -47,11 +51,12 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   const handleRegister = async () => {
+    Keyboard.dismiss();
     if (!firstName.trim()) { Alert.alert(t.common.error, t.register.errors.noName); return; }
     if (!lastName.trim()) { Alert.alert(t.common.error, t.register.errors.noLastName); return; }
     if (!validateAge(birthDate)) { Alert.alert(t.common.error, t.register.errors.ageError); return; }
     if (!email.trim()) { Alert.alert(t.common.error, t.register.errors.noEmail); return; }
-    if (password.length < 6) { Alert.alert(t.common.error, t.register.errors.shortPassword); return; }
+    if (password.length < 8) { Alert.alert(t.common.error, t.register.errors.shortPassword); return; }
 
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({
@@ -76,32 +81,83 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <Text style={styles.title}>{t.register.title}</Text>
           <Text style={styles.subtitle}>{t.register.subtitle}</Text>
 
-          <TextInput style={styles.input} placeholder={t.register.firstName}
-            placeholderTextColor={Colors.textSecondary} value={firstName}
-            onChangeText={setFirstName} autoCapitalize="words" />
+          <TextInput
+            style={styles.input}
+            placeholder={t.register.firstName}
+            placeholderTextColor={Colors.textSecondary}
+            value={firstName}
+            onChangeText={setFirstName}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => lastNameRef.current?.focus()}
+            blurOnSubmit={false}
+          />
 
-          <TextInput style={styles.input} placeholder={t.register.lastName}
-            placeholderTextColor={Colors.textSecondary} value={lastName}
-            onChangeText={setLastName} autoCapitalize="words" />
+          <TextInput
+            ref={lastNameRef}
+            style={styles.input}
+            placeholder={t.register.lastName}
+            placeholderTextColor={Colors.textSecondary}
+            value={lastName}
+            onChangeText={setLastName}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => birthDateRef.current?.focus()}
+            blurOnSubmit={false}
+          />
 
-          <TextInput style={styles.input} placeholder={t.register.birthDate}
-            placeholderTextColor={Colors.textSecondary} value={birthDate}
+          <TextInput
+            ref={birthDateRef}
+            style={styles.input}
+            placeholder={t.register.birthDate}
+            placeholderTextColor={Colors.textSecondary}
+            value={birthDate}
             onChangeText={(text) => setBirthDate(formatBirthDate(text))}
-            keyboardType="numeric" maxLength={10} />
+            keyboardType="numeric"
+            maxLength={10}
+            returnKeyType="next"
+            onSubmitEditing={() => emailRef.current?.focus()}
+            blurOnSubmit={false}
+          />
 
-          <TextInput style={styles.input} placeholder={t.register.email}
-            placeholderTextColor={Colors.textSecondary} value={email}
-            onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+          <TextInput
+            ref={emailRef}
+            style={styles.input}
+            placeholder={t.register.email}
+            placeholderTextColor={Colors.textSecondary}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            blurOnSubmit={false}
+          />
 
-          <TextInput style={styles.input} placeholder={t.register.password}
-            placeholderTextColor={Colors.textSecondary} value={password}
-            onChangeText={setPassword} secureTextEntry />
+          <TextInput
+            ref={passwordRef}
+            style={styles.input}
+            placeholder={t.register.password}
+            placeholderTextColor={Colors.textSecondary}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            returnKeyType="go"
+            onSubmitEditing={handleRegister}
+          />
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
@@ -117,8 +173,8 @@ export default function RegisterScreen({ navigation }: any) {
             </Text>
           </TouchableOpacity>
         </ScrollView>
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

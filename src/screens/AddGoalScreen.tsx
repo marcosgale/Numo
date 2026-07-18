@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, Keyboard, TouchableWithoutFeedback, ScrollView
+  Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
@@ -24,6 +24,9 @@ export default function AddGoalScreen({ route, navigation }: any) {
   const [emoji, setEmoji] = useState(isEditing ? (goal.emoji || '🎯') : '🎯');
   const [deadline, setDeadline] = useState(isEditing && goal.deadline ? formatDateToDisplay(goal.deadline) : '');
   const [loading, setLoading] = useState(false);
+
+  const targetAmountRef = useRef<TextInput>(null);
+  const deadlineRef = useRef<TextInput>(null);
 
   function formatDateToDisplay(isoDate: string): string {
     const parts = isoDate.split('-');
@@ -56,6 +59,7 @@ export default function AddGoalScreen({ route, navigation }: any) {
   };
 
   const handleSave = async () => {
+    Keyboard.dismiss();
     if (!name.trim()) {
       Alert.alert(t.common.error, t.addGoal.errors.noName);
       return;
@@ -115,19 +119,23 @@ export default function AddGoalScreen({ route, navigation }: any) {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <ChevronLeft size={28} color={Colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{isEditing ? t.addGoal.editTitle : t.addGoal.title}</Text>
-          <View style={{ width: 28 }} />
-        </View>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <ChevronLeft size={28} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{isEditing ? t.addGoal.editTitle : t.addGoal.title}</Text>
+        <View style={{ width: 28 }} />
+      </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <ScrollView
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* NOMBRE */}
           <View style={styles.section}>
@@ -139,6 +147,9 @@ export default function AddGoalScreen({ route, navigation }: any) {
               value={name}
               onChangeText={setName}
               autoFocus={!isEditing}
+              returnKeyType="next"
+              onSubmitEditing={() => targetAmountRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
 
@@ -162,12 +173,16 @@ export default function AddGoalScreen({ route, navigation }: any) {
             <Text style={styles.sectionLabel}>{t.addGoal.targetAmount}</Text>
             <View style={styles.amountRow}>
               <TextInput
+                ref={targetAmountRef}
                 style={styles.amountInput}
                 placeholder="0.00"
                 placeholderTextColor={Colors.textSecondary}
                 value={targetAmount}
                 onChangeText={(text) => setTargetAmount(formatAmount(text))}
                 keyboardType="decimal-pad"
+                returnKeyType="next"
+                onSubmitEditing={() => deadlineRef.current?.focus()}
+                blurOnSubmit={false}
               />
               <Text style={styles.amountCurrency}>€</Text>
             </View>
@@ -193,6 +208,7 @@ export default function AddGoalScreen({ route, navigation }: any) {
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>{t.addGoal.deadline}</Text>
             <TextInput
+              ref={deadlineRef}
               style={styles.input}
               placeholder="DD/MM/YYYY"
               placeholderTextColor={Colors.textSecondary}
@@ -200,6 +216,8 @@ export default function AddGoalScreen({ route, navigation }: any) {
               onChangeText={(text) => setDeadline(formatDeadline(text))}
               keyboardType="numeric"
               maxLength={10}
+              returnKeyType="done"
+              onSubmitEditing={handleSave}
             />
           </View>
 
@@ -214,8 +232,8 @@ export default function AddGoalScreen({ route, navigation }: any) {
             </Text>
           </TouchableOpacity>
         </ScrollView>
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
