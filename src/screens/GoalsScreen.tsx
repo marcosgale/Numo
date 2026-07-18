@@ -6,6 +6,7 @@ import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { CANONICAL_CAT_KEY } from '../data/categories';
 
 type Goal = {
   id: string;
@@ -28,16 +29,6 @@ type SpentMap = { [categoryId: string]: number };
 type Tab = 'plan' | 'goals' | 'limits';
 
 // Maps canonical Spanish names → planner translation key
-const CANONICAL_KEY: Record<string, string> = {
-  'vivienda': 'vivienda', 'alimentación': 'alimentacion', 'alimentacion': 'alimentacion',
-  'transporte': 'transporte', 'facturas': 'facturas', 'ocio': 'ocio',
-  'compras': 'compras', 'suscripciones': 'suscripciones', 'salud': 'salud',
-  'ahorro': 'ahorro', 'hogar': 'hogar', 'educación': 'educacion', 'educacion': 'educacion',
-  'otros': 'otros', 'restaurantes': 'restaurantes', 'ropa': 'ropa',
-  'mascota': 'mascota', 'mascotas': 'mascota', 'deporte': 'deporte',
-  'viaje': 'viaje', 'viajes': 'viaje', 'tecnología': 'tecnologia', 'tecnologia': 'tecnologia',
-};
-
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function GoalsScreen() {
   const Colors = useColors();
@@ -46,7 +37,7 @@ export default function GoalsScreen() {
   const navigation = useNavigation<any>();
 
   const translateCatName = (name: string) => {
-    const key = CANONICAL_KEY[name.toLowerCase()];
+    const key = CANONICAL_CAT_KEY[name.toLowerCase()];
     return key ? ((t.planner.items as Record<string, string>)[key] ?? name) : name;
   };
 

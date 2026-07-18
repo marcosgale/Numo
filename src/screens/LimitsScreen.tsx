@@ -6,6 +6,7 @@ import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { CANONICAL_CAT_KEY } from '../data/categories';
 
 type Limit = {
   id: string;
@@ -20,16 +21,6 @@ type Limit = {
 };
 
 type SpentMap = { [categoryId: string]: number };
-
-const CANONICAL_CAT_KEY: Record<string, string> = {
-  'vivienda': 'vivienda', 'alimentación': 'alimentacion', 'alimentacion': 'alimentacion',
-  'transporte': 'transporte', 'facturas': 'facturas', 'ocio': 'ocio',
-  'compras': 'compras', 'suscripciones': 'suscripciones', 'salud': 'salud',
-  'ahorro': 'ahorro', 'hogar': 'hogar', 'educación': 'educacion', 'educacion': 'educacion',
-  'otros': 'otros', 'restaurantes': 'restaurantes', 'ropa': 'ropa',
-  'mascota': 'mascota', 'mascotas': 'mascota', 'deporte': 'deporte',
-  'viaje': 'viaje', 'viajes': 'viaje', 'tecnología': 'tecnologia', 'tecnologia': 'tecnologia',
-};
 
 export default function LimitsScreen() {
   const Colors = useColors();

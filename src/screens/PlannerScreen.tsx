@@ -9,6 +9,7 @@ import { ChevronLeft, X, Plus } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
+import { CANONICAL_CAT_KEY } from '../data/categories';
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 // `es` is the canonical name used to match/create categories in Supabase.
@@ -17,8 +18,8 @@ const PLAN_DEFAULTS = [
   { key: 'vivienda',     es: 'Vivienda',     icon: '🏠', color: '#54A0FF' },
   { key: 'alimentacion', es: 'Alimentación', icon: '🍔', color: '#FF9F43' },
   { key: 'transporte',   es: 'Transporte',   icon: '🚗', color: '#FECA57' },
-  { key: 'ocio',         es: 'Ocio',         icon: '🎮', color: '#5F27CD' },
-  { key: 'compras',      es: 'Compras',      icon: '🛍️', color: '#FF9FF3' },
+  { key: 'ocio',         es: 'Ocio',         icon: '🎉', color: '#5F27CD' },
+  { key: 'compras',      es: 'Compras',      icon: '🛒', color: '#FF9FF3' },
 ] as const;
 
 type DefaultKey = typeof PLAN_DEFAULTS[number]['key'];
@@ -55,15 +56,6 @@ let uidCounter = 0;
 const uid = () => `plan_${++uidCounter}_${Date.now()}`;
 
 // ── Component ─────────────────────────────────────────────────────────────────
-const CANONICAL_CAT_KEY: Record<string, string> = {
-  'vivienda': 'vivienda', 'alimentación': 'alimentacion', 'alimentacion': 'alimentacion',
-  'transporte': 'transporte', 'facturas': 'facturas', 'ocio': 'ocio',
-  'compras': 'compras', 'suscripciones': 'suscripciones', 'salud': 'salud',
-  'ahorro': 'ahorro', 'hogar': 'hogar', 'educación': 'educacion', 'educacion': 'educacion',
-  'otros': 'otros', 'restaurantes': 'restaurantes', 'ropa': 'ropa',
-  'mascota': 'mascota', 'mascotas': 'mascota', 'deporte': 'deporte',
-  'viaje': 'viaje', 'viajes': 'viaje', 'tecnología': 'tecnologia', 'tecnologia': 'tecnologia',
-};
 
 export default function PlannerScreen({ navigation }: any) {
   const Colors = useColors();
