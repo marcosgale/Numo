@@ -5,13 +5,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   LogOut, ChevronRight, User, Tag, Bell, Shield,
-  CircleHelp, Sun, Moon, Smartphone, Globe
+  CircleHelp, Sun, Moon, Smartphone, Globe, Compass
 } from 'lucide-react-native';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useTutorial } from '../contexts/TutorialContext';
 
 type Profile = {
   first_name: string;
@@ -28,6 +29,7 @@ export default function ProfileScreen() {
   const styles = makeStyles(Colors);
   const { theme, setTheme } = useTheme();
   const navigation = useNavigation<any>();
+  const { startTutorial } = useTutorial();
 
   const THEME_OPTIONS: { value: ThemePreference; label: string; Icon: any }[] = [
     { value: 'light', label: t.profile.light, Icon: Sun },
@@ -76,6 +78,7 @@ export default function ProfileScreen() {
     { icon: Bell, label: t.profile.notifications, onPress: () => navigation.navigate('Notifications') },
     { icon: Shield, label: t.profile.privacy, onPress: () => navigation.navigate('Privacy') },
     { icon: CircleHelp, label: t.profile.help, onPress: () => navigation.navigate('Help') },
+    { icon: Compass, label: t.tutorial.menuItem, onPress: () => startTutorial(0) },
   ];
 
   return (

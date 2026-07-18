@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Session } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,6 +10,8 @@ import AuthNavigator from './src/navigation/AuthNavigator';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 import { LanguageProvider } from './src/contexts/LanguageContext';
+import { TutorialProvider } from './src/contexts/TutorialContext';
+import TutorialOverlay from './src/components/TutorialOverlay';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -54,7 +57,12 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <LanguageProvider>
         <ThemeProvider>
-          {session ? <Navigation /> : <AuthNavigator />}
+          <TutorialProvider>
+            <View style={{ flex: 1 }}>
+              {session ? <Navigation /> : <AuthNavigator />}
+              <TutorialOverlay />
+            </View>
+          </TutorialProvider>
         </ThemeProvider>
       </LanguageProvider>
     </GestureHandlerRootView>

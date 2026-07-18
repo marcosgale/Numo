@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Home, Users, TrendingUp, User, Plus } from 'lucide-react-native';
@@ -27,6 +27,8 @@ import HelpScreen from '../screens/HelpScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import PlannerScreen from '../screens/PlannerScreen';
 import AddButton from '../components/AddButton';
+
+export const navigationRef = createNavigationContainerRef();
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -133,7 +135,7 @@ function MainTabs({ navigation }: any) {
 export default function Navigation() {
   const Colors = useColors();
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.background } }}>
         <Stack.Screen name="MainTabs" component={MainTabs} />
         <Stack.Screen

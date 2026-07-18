@@ -398,6 +398,60 @@ export const translations = {
         { q: '¿Puedo usar Numo sin conexión a internet?', a: 'Por el momento Numo requiere conexión a internet para sincronizar tus datos. Estamos trabajando en un modo offline para una futura versión.' },
       ],
     },
+    tutorial: {
+      menuItem: 'Tutorial interactivo',
+      progressLabel: (current: number, total: number) => `Paso ${current} de ${total}`,
+      next: 'Siguiente',
+      back: 'Atrás',
+      skip: 'Omitir',
+      finish: '¡Listo!',
+      steps: {
+        welcome: {
+          title: '¡Bienvenido a Numo! 👋',
+          description: 'Te guiamos por las funciones clave en 2 minutos. Puedes saltar o pausar cuando quieras.',
+        },
+        dashboard_overview: {
+          title: 'Tu panel principal',
+          description: 'Aquí tienes un resumen de tu vida financiera: balance, ingresos, gastos y tus últimos movimientos.',
+        },
+        dashboard_balance: {
+          title: 'Tu balance',
+          description: 'Tu saldo total en tu moneda base. Se actualiza automáticamente con cada movimiento que registras.',
+        },
+        dashboard_summary: {
+          title: 'Resumen mensual',
+          description: 'Cuánto has ingresado, gastado y ahorrado este mes, de un solo vistazo.',
+        },
+        dashboard_add: {
+          title: 'Añadir movimientos',
+          description: 'El botón + abre el menú para registrar un gasto, ingreso, pago recurrente o gasto compartido.',
+        },
+        plan_overview: {
+          title: 'Planifica tus gastos',
+          description: 'Crea un presupuesto mensual por categorías y establece límites para controlar mejor tu dinero.',
+        },
+        plan_tabs: {
+          title: 'Plan · Metas · Límites',
+          description: 'Tres herramientas en una pantalla: tu plan mensual, tus metas de ahorro y el seguimiento de límites.',
+        },
+        goals: {
+          title: 'Metas de ahorro',
+          description: 'Crea objetivos como un viaje o un fondo de emergencia. Registra aportaciones y sigue el progreso visualmente.',
+        },
+        groups: {
+          title: 'Gastos compartidos',
+          description: 'Crea grupos con amigos o familia para dividir gastos fácilmente. La app calcula quién debe qué.',
+        },
+        profile: {
+          title: 'Tu perfil y ajustes',
+          description: 'Cambia el idioma, el tema o tu moneda base. Aquí también puedes editar tu información y repetir este tutorial.',
+        },
+        done: {
+          title: '¡Ya eres un experto! 🎉',
+          description: 'Ahora conoces lo esencial de Numo. ¡Empieza a gestionar tus finanzas con confianza!',
+        },
+      },
+    },
     planner: {
       title: 'Plan de gastos',
       createPlan: 'Crear plan completo',
@@ -828,6 +882,60 @@ export const translations = {
         { q: 'Is my financial information secure?', a: 'Yes. Numo uses Supabase as a database with secure authentication and access policies that ensure only you can see your data. We never share your information with third parties.' },
         { q: 'Can I use Numo without an internet connection?', a: 'For now Numo requires an internet connection to sync your data. We are working on an offline mode for a future version.' },
       ],
+    },
+    tutorial: {
+      menuItem: 'Interactive Tutorial',
+      progressLabel: (current: number, total: number) => `Step ${current} of ${total}`,
+      next: 'Next',
+      back: 'Back',
+      skip: 'Skip',
+      finish: 'Done!',
+      steps: {
+        welcome: {
+          title: 'Welcome to Numo! 👋',
+          description: 'We\'ll walk you through the key features in 2 minutes. You can skip or pause anytime.',
+        },
+        dashboard_overview: {
+          title: 'Your main dashboard',
+          description: 'Here\'s a summary of your financial life: balance, income, expenses, and your latest transactions.',
+        },
+        dashboard_balance: {
+          title: 'Your balance',
+          description: 'Your total balance in your base currency, updated automatically with every transaction you log.',
+        },
+        dashboard_summary: {
+          title: 'Monthly summary',
+          description: 'How much you\'ve earned, spent, and saved this month — all at a glance.',
+        },
+        dashboard_add: {
+          title: 'Add transactions',
+          description: 'The + button opens the menu to log an expense, income, recurring payment, or shared expense.',
+        },
+        plan_overview: {
+          title: 'Plan your spending',
+          description: 'Set a monthly budget per category and define limits to keep better track of your money.',
+        },
+        plan_tabs: {
+          title: 'Plan · Goals · Limits',
+          description: 'Three tools in one screen: your spending plan, savings goals, and limit tracking.',
+        },
+        goals: {
+          title: 'Savings goals',
+          description: 'Create goals like a travel fund or emergency savings. Log contributions and track progress visually.',
+        },
+        groups: {
+          title: 'Shared expenses',
+          description: 'Create groups with friends or family to split costs easily. The app calculates who owes what.',
+        },
+        profile: {
+          title: 'Your profile & settings',
+          description: 'Change language, theme, or base currency. You can also edit your info and replay this tutorial here.',
+        },
+        done: {
+          title: 'You\'re all set! 🎉',
+          description: 'You now know everything Numo can do. Start managing your finances with confidence!',
+        },
+      },
     },
     planner: {
       title: 'Monthly budget',
