@@ -19,6 +19,16 @@ type Category = {
   user_id: string | null;
 };
 
+const CANONICAL_CAT_KEY: Record<string, string> = {
+  'vivienda': 'vivienda', 'alimentación': 'alimentacion', 'alimentacion': 'alimentacion',
+  'transporte': 'transporte', 'facturas': 'facturas', 'ocio': 'ocio',
+  'compras': 'compras', 'suscripciones': 'suscripciones', 'salud': 'salud',
+  'ahorro': 'ahorro', 'hogar': 'hogar', 'educación': 'educacion', 'educacion': 'educacion',
+  'otros': 'otros', 'restaurantes': 'restaurantes', 'ropa': 'ropa',
+  'mascota': 'mascota', 'mascotas': 'mascota', 'deporte': 'deporte',
+  'viaje': 'viaje', 'viajes': 'viaje', 'tecnología': 'tecnologia', 'tecnologia': 'tecnologia',
+};
+
 const COLORS = [
   '#FF6B6B', '#FF9F43', '#FECA57', '#48DBFB',
   '#1DD1A1', '#54A0FF', '#5F27CD', '#FF9FF3',
@@ -35,6 +45,12 @@ export default function CategoriesScreen({ navigation }: any) {
   const Colors = useColors();
   const { t } = useLanguage();
   const styles = makeStyles(Colors);
+
+  const translateCatName = (name: string) => {
+    const key = CANONICAL_CAT_KEY[name.toLowerCase()];
+    if (!key) return name;
+    return (t.planner.items as Record<string, string>)[key] ?? name;
+  };
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +89,15 @@ export default function CategoriesScreen({ navigation }: any) {
       return;
     }
 
+    const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+    const isDuplicate = categories.some(
+      c => c.type === newType && normalize(c.name) === normalize(newName.trim())
+    );
+    if (isDuplicate) {
+      Alert.alert(t.common.error, t.categories.errors.duplicate);
+      return;
+    }
+
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setSaving(false); return; }
@@ -105,7 +130,7 @@ export default function CategoriesScreen({ navigation }: any) {
     }
     Alert.alert(
       t.categories.deleteTitle,
-      t.categories.deleteMsg(cat.name),
+      t.categories.deleteMsg(translateCatName(cat.name)),
       [
         { text: t.common.cancel, style: 'cancel' },
         {
@@ -169,7 +194,7 @@ export default function CategoriesScreen({ navigation }: any) {
                 <View style={[styles.catIcon, { backgroundColor: cat.color + '20' }]}>
                   <Text style={{ fontSize: 22 }}>{cat.icon}</Text>
                 </View>
-                <Text style={styles.catName}>{cat.name}</Text>
+                <Text style={styles.catName}>{translateCatName(cat.name)}</Text>
                 {cat.user_id && (
                   <TouchableOpacity onPress={() => handleDelete(cat)} style={styles.deleteBtn}>
                     <Trash2 size={16} color={Colors.negative} />

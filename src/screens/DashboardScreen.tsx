@@ -118,33 +118,44 @@ export default function DashboardScreen() {
       .order('created_at', { ascending: false }).limit(3);
     if (goalsData) setGoals(goalsData);
 
-    // Límites con gasto real
+    // Límites con gasto real (batched)
     const { data: limitsData } = await supabase
-      .from('limits').select('id, amount, period, categories(id, name, icon, color)')
+      .from('limits')
+      .select('id, amount, period, categories(id, name, icon, color)')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (limitsData && limitsData.length > 0) {
-      const result: LimitWithSpent[] = [];
-      for (const limit of limitsData as any) {
-        let startDate: string;
-        if (limit.period === 'daily') {
-          startDate = now.toISOString().split('T')[0];
-        } else if (limit.period === 'weekly') {
-          const ws = new Date(now);
-          ws.setDate(ws.getDate() - ws.getDay() + 1);
-          startDate = ws.toISOString().split('T')[0];
-        } else {
-          startDate = startOfMonth;
-        }
-        const { data: txData } = await supabase
-          .from('transactions').select('base_amount')
-          .eq('category_id', limit.categories.id).eq('type', 'expense')
-          .gte('date', startDate).is('goal_id', null);
-        result.push({
+      const today = now.toISOString().split('T')[0];
+      const dow = now.getDay();
+      const wsDate = new Date(now);
+      wsDate.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+      const startOfWeek = wsDate.toISOString().split('T')[0];
+
+      const catIds = (limitsData as any[]).map(l => l.categories?.id).filter(Boolean);
+
+      const { data: txData } = await supabase
+        .from('transactions')
+        .select('category_id, amount, base_amount, date')
+        .eq('type', 'expense')
+        .eq('user_id', user.id)
+        .in('category_id', catIds)
+        .gte('date', startOfMonth)
+        .is('goal_id', null);
+
+      const allTx = (txData || []) as any[];
+
+      const result: LimitWithSpent[] = (limitsData as any[]).map(limit => {
+        const catId = limit.categories?.id;
+        const cutoff = limit.period === 'daily' ? today
+                     : limit.period === 'weekly' ? startOfWeek
+                     : startOfMonth;
+        const catTx = allTx.filter(tx => tx.category_id === catId && tx.date >= cutoff);
+        return {
           ...limit,
-          spent: txData ? txData.reduce((s: number, t: any) => s + Number(t.base_amount), 0) : 0,
-        });
-      }
+          spent: catTx.reduce((s: number, tx: any) => s + Number(tx.base_amount ?? tx.amount), 0),
+        };
+      });
       setLimits(result);
     } else {
       setLimits([]);

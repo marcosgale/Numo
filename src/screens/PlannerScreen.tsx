@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, KeyboardAvoidingView,
@@ -78,6 +78,8 @@ export default function PlannerScreen({ navigation }: any) {
 
   const [period, setPeriod] = useState<Period>('monthly');
   const [items, setItems] = useState<PlanItem[]>([]);
+  // Per-period draft cache so unsaved amounts survive period switches
+  const periodAmounts = useRef<Partial<Record<Period, Record<string, string>>>>({});
   const [allLimits, setAllLimits] = useState<ExistingLimit[]>([]);
   const [extraCategories, setExtraCategories] = useState<SupabaseCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,14 +112,17 @@ export default function PlannerScreen({ navigation }: any) {
 
     setAllLimits(limitList);
 
+    const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+
     // Build default items, matching existing Supabase categories by name
     const defaultItems: PlanItem[] = PLAN_DEFAULTS.map(def => {
       const displayName = (t.planner.items as Record<string, string>)[def.key] ?? def.es;
-      // Match: canonical Spanish name OR translated EN name
-      const matched = catList.find(
-        c => c.name.toLowerCase() === def.es.toLowerCase() ||
-             c.name.toLowerCase() === displayName.toLowerCase()
-      );
+      const normEs = normalize(def.es);
+      const normDisplay = normalize(displayName);
+      const matched = catList.find(c => {
+        const n = normalize(c.name);
+        return n === normEs || n === normDisplay;
+      });
       // Pre-fill from monthly limits
       const existingLimit = limitList.find(
         l => l.period === 'monthly' && l.category_id === matched?.id
@@ -137,14 +142,14 @@ export default function PlannerScreen({ navigation }: any) {
     setItems(defaultItems);
 
     // Extra categories = user's categories NOT covered by defaults
-    const defaultNames = PLAN_DEFAULTS.map(d => d.es.toLowerCase());
-    const defaultTranslated = PLAN_DEFAULTS.map(
-      d => ((t.planner.items as Record<string, string>)[d.key] ?? d.es).toLowerCase()
+    const defaultNorms = PLAN_DEFAULTS.map(d => normalize(d.es));
+    const defaultTranslatedNorms = PLAN_DEFAULTS.map(
+      d => normalize((t.planner.items as Record<string, string>)[d.key] ?? d.es)
     );
-    const extras = catList.filter(
-      c => !defaultNames.includes(c.name.toLowerCase()) &&
-           !defaultTranslated.includes(c.name.toLowerCase())
-    );
+    const extras = catList.filter(c => {
+      const n = normalize(c.name);
+      return !defaultNorms.includes(n) && !defaultTranslatedNorms.includes(n);
+    });
     setExtraCategories(extras);
 
     setLoading(false);
@@ -152,11 +157,23 @@ export default function PlannerScreen({ navigation }: any) {
 
   // ── Period change ─────────────────────────────────────────────────────────
   const handlePeriodChange = (next: Period) => {
+    if (next === period) return;
+    // Snapshot current period's typed amounts before leaving
+    const snapshot: Record<string, string> = {};
+    items.forEach(item => {
+      const key = item.categoryId ?? item.defaultKey ?? item.uid;
+      snapshot[key] = item.amount;
+    });
+    periodAmounts.current[period] = snapshot;
+
     setPeriod(next);
     setItems(prev => prev.map(item => {
-      const lim = allLimits.find(
-        l => l.period === next && l.category_id === item.categoryId
-      );
+      const key = item.categoryId ?? item.defaultKey ?? item.uid;
+      // Restore from draft cache first (user previously typed here)
+      const cached = periodAmounts.current[next]?.[key];
+      if (cached !== undefined) return { ...item, amount: cached };
+      // Fall back to saved limits from Supabase
+      const lim = allLimits.find(l => l.period === next && l.category_id === item.categoryId);
       return { ...item, amount: lim ? String(lim.amount) : '' };
     }));
   };
@@ -234,12 +251,13 @@ export default function PlannerScreen({ navigation }: any) {
         let catId = item.categoryId;
 
         if (!catId) {
-          // Try to find by name first
+          // Try to find by canonical (Spanish) OR translated (EN) name
           const { data: found } = await supabase
             .from('categories')
             .select('id')
             .eq('user_id', user.id)
-            .ilike('name', item.canonicalName)
+            .eq('type', 'expense')
+            .or(`name.ilike.${item.canonicalName},name.ilike.${item.displayName}`)
             .maybeSingle();
 
           if (found) {

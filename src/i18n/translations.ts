@@ -156,6 +156,7 @@ export const translations = {
         noName: 'Dale un nombre a tu meta',
         noAmount: 'Introduce una cantidad objetivo',
         invalidDate: 'Formato de fecha inválido (DD/MM/YYYY)',
+        pastDate: 'La fecha objetivo no puede ser en el pasado',
         noSession: 'No hay sesión activa',
       },
     },
@@ -379,7 +380,7 @@ export const translations = {
       cannotDeleteMsg: 'Las categorías predefinidas no se pueden eliminar',
       deleteTitle: 'Eliminar categoría',
       deleteMsg: (name: string) => `¿Eliminar "${name}"? Las transacciones asociadas no se borrarán.`,
-      errors: { noName: 'Dale un nombre a la categoría' },
+      errors: { noName: 'Dale un nombre a la categoría', duplicate: 'Ya existe una categoría con ese nombre' },
     },
     help: {
       title: 'Ayuda',
@@ -586,6 +587,7 @@ export const translations = {
         noName: 'Give your goal a name',
         noAmount: 'Enter a target amount',
         invalidDate: 'Invalid date format (DD/MM/YYYY)',
+        pastDate: 'The target date cannot be in the past',
         noSession: 'No active session',
       },
     },
@@ -809,7 +811,7 @@ export const translations = {
       cannotDeleteMsg: 'Default categories cannot be deleted',
       deleteTitle: 'Delete category',
       deleteMsg: (name: string) => `Delete "${name}"? Associated transactions will not be deleted.`,
-      errors: { noName: 'Give the category a name' },
+      errors: { noName: 'Give the category a name', duplicate: 'A category with this name already exists' },
     },
     help: {
       title: 'Help',

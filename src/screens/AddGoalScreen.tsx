@@ -68,9 +68,19 @@ export default function AddGoalScreen({ route, navigation }: any) {
       Alert.alert(t.common.error, t.addGoal.errors.noAmount);
       return;
     }
-    if (deadline && !parseDeadline(deadline)) {
+    const parsedDeadline = parseDeadline(deadline);
+    if (deadline && !parsedDeadline) {
       Alert.alert(t.common.error, t.addGoal.errors.invalidDate);
       return;
+    }
+    if (parsedDeadline && !isEditing) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const deadlineDate = new Date(parsedDeadline + 'T00:00:00');
+      if (deadlineDate < today) {
+        Alert.alert(t.common.error, t.addGoal.errors.pastDate);
+        return;
+      }
     }
 
     setLoading(true);
@@ -86,7 +96,7 @@ export default function AddGoalScreen({ route, navigation }: any) {
       name: name.trim(),
       description: description.trim() || null,
       target_amount: parseFloat(targetAmount),
-      deadline: parseDeadline(deadline),
+      deadline: parsedDeadline,
       emoji: emoji,
     };
 

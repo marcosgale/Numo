@@ -1,8 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, Trash2 } from 'lucide-react-native';
-import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
 import { useColors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabase';
@@ -39,32 +38,6 @@ const CANONICAL_KEY: Record<string, string> = {
   'viaje': 'viaje', 'viajes': 'viaje', 'tecnología': 'tecnologia', 'tecnologia': 'tecnologia',
 };
 
-// ── Circular progress ─────────────────────────────────────────────────────────
-function CircularProgress({ progress, size = 68, strokeWidth = 5, color, trackColor }: {
-  progress: number; size?: number; strokeWidth?: number; color: string; trackColor: string;
-}) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (Math.min(progress, 100) / 100) * circumference;
-  const center = size / 2;
-  return (
-    <Svg width={size} height={size}>
-      <G rotation="-90" origin={`${center}, ${center}`}>
-        <Circle cx={center} cy={center} r={radius} stroke={trackColor} strokeWidth={strokeWidth} fill="none" />
-        <Circle
-          cx={center} cy={center} r={radius}
-          stroke={color} strokeWidth={strokeWidth} fill="none"
-          strokeDasharray={`${circumference} ${circumference}`}
-          strokeDashoffset={offset} strokeLinecap="round"
-        />
-      </G>
-      <SvgText x={center} y={center + 5} textAnchor="middle" fontSize={13} fontWeight="700" fill={color}>
-        {Math.round(progress)}%
-      </SvgText>
-    </Svg>
-  );
-}
-
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function GoalsScreen() {
   const Colors = useColors();
@@ -91,6 +64,23 @@ export default function GoalsScreen() {
     }, [])
   );
 
+  // Keep a stable ref to fetchLimits so the navigation listener never captures a stale closure
+  const fetchLimitsRef = useRef<() => Promise<void>>();
+  useEffect(() => { fetchLimitsRef.current = fetchLimits; });
+
+  // AddTransaction/AddGoal/AddLimit are root-stack modals — on iOS they do NOT blur
+  // the tab screen below, so useFocusEffect never re-fires after they dismiss.
+  // Listening to the parent (root stack) state change catches every push/pop, so
+  // fetchLimits runs once when the modal closes and the data stays current.
+  useEffect(() => {
+    const parent = navigation.getParent();
+    if (!parent) return;
+    const unsubscribe = parent.addListener('state', () => {
+      fetchLimitsRef.current?.();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   const fetchGoals = async () => {
     setLoadingGoals(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -116,34 +106,54 @@ export default function GoalsScreen() {
 
     if (limitsData) setLimits(limitsData as any);
 
-    const now = new Date();
     const spentMap: SpentMap = {};
-    if (limitsData) {
-      for (const limit of limitsData as any) {
-        let startDate: string;
-        if (limit.period === 'daily') {
-          startDate = now.toISOString().split('T')[0];
-        } else if (limit.period === 'weekly') {
-          const weekStart = new Date(now);
-          weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
-          startDate = weekStart.toISOString().split('T')[0];
-        } else {
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-        }
-        const { data: txData } = await supabase
-          .from('transactions').select('base_amount')
-          .eq('category_id', limit.categories.id)
-          .eq('type', 'expense')
-          .eq('user_id', user.id)
-          .gte('date', startDate)
-          .is('goal_id', null);
-        if (txData) {
-          spentMap[limit.categories.id] = txData.reduce(
-            (sum: number, tx: any) => sum + Number(tx.base_amount), 0
-          );
-        }
+
+    if (limitsData && limitsData.length > 0) {
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      // Monday-based week start
+      const dow = now.getDay();
+      const diffToMonday = (dow === 0 ? 6 : dow - 1);
+      const weekStartDate = new Date(now);
+      weekStartDate.setDate(now.getDate() - diffToMonday);
+      const startOfWeek = weekStartDate.toISOString().split('T')[0];
+
+      const categoryIds = (limitsData as any[])
+        .map(l => l.categories?.id)
+        .filter(Boolean);
+
+      // Single batched query — one round-trip for all limits
+      const { data: txData } = await supabase
+        .from('transactions')
+        .select('category_id, amount, base_amount, date')
+        .eq('type', 'expense')
+        .eq('user_id', user.id)
+        .in('category_id', categoryIds)
+        .gte('date', startOfMonth)   // covers monthly, weekly, and daily
+        .is('goal_id', null);
+
+      const allTx = (txData || []) as any[];
+
+      for (const limit of limitsData as any[]) {
+        const catId = limit.categories?.id;
+        if (!catId) continue;
+
+        // Choose the cutoff date for this limit's period
+        let cutoff: string;
+        if (limit.period === 'daily') cutoff = today;
+        else if (limit.period === 'weekly') cutoff = startOfWeek;
+        else cutoff = startOfMonth;
+
+        const catTx = allTx.filter(tx => tx.category_id === catId && tx.date >= cutoff);
+        spentMap[catId] = catTx.reduce(
+          // base_amount is the amount in the user's base currency; fall back to amount if null
+          (sum: number, tx: any) => sum + Number(tx.base_amount ?? tx.amount),
+          0
+        );
       }
     }
+
     setSpent(spentMap);
     setLoadingLimits(false);
   };
@@ -168,9 +178,8 @@ export default function GoalsScreen() {
 
   const getGoalColor = (progress: number) => {
     if (progress >= 100) return Colors.positive;
-    if (progress >= 60) return Colors.primary;
-    if (progress >= 30) return Colors.warning;
-    return Colors.negative;
+    if (progress === 0) return Colors.textSecondary;
+    return Colors.primary;
   };
 
   const getLimitColor = (pct: number) => {
@@ -423,6 +432,10 @@ export default function GoalsScreen() {
                   const progress = getProgress(Number(goal.current_amount), Number(goal.target_amount));
                   const daysLeft = getDaysLeft(goal.deadline);
                   const color = getGoalColor(progress);
+                  const remaining = Number(goal.target_amount) - Number(goal.current_amount);
+                  const isComplete = progress >= 100;
+                  const isExpired = daysLeft === t.goals.expired;
+
                   return (
                     <TouchableOpacity
                       key={goal.id}
@@ -430,25 +443,63 @@ export default function GoalsScreen() {
                       onPress={() => navigation.navigate('GoalDetail', { goalId: goal.id })}
                       activeOpacity={0.7}
                     >
-                      <View style={styles.goalCardInner}>
-                        <CircularProgress progress={progress} size={68} strokeWidth={5} color={color} trackColor={Colors.border} />
-                        <View style={styles.goalInfo}>
-                          <Text style={styles.goalName} numberOfLines={1}>
-                            {goal.emoji || '🎯'} {goal.name}
-                          </Text>
+                      {/* Top row: emoji + name + deadline + trash */}
+                      <View style={styles.goalCardTop}>
+                        <View style={[styles.goalEmojiBox, { backgroundColor: color + '18' }]}>
+                          <Text style={styles.goalEmoji}>{goal.emoji || '🎯'}</Text>
+                        </View>
+                        <View style={styles.goalTitleGroup}>
+                          <Text style={styles.goalName} numberOfLines={1}>{goal.name}</Text>
                           {daysLeft && (
-                            <Text style={[styles.goalDeadline, daysLeft === t.goals.expired && { color: Colors.negative }]}>
-                              {daysLeft === t.goals.expired ? `⚠️ ${t.goals.expired}` : `⏳ ${daysLeft} ${t.goals.remaining}`}
+                            <Text style={[styles.goalDeadlineTxt, isExpired && { color: Colors.negative }]}>
+                              {isExpired ? `⚠️ ${t.goals.expired}` : `⏳ ${daysLeft} ${t.goals.remaining}`}
                             </Text>
                           )}
-                          <View style={styles.goalAmounts}>
-                            <Text style={[styles.goalSaved, { color }]}>{formatMoney(Number(goal.current_amount))} €</Text>
-                            <Text style={styles.goalOf}> {t.common.of} {formatMoney(Number(goal.target_amount))} €</Text>
-                          </View>
                         </View>
-                        <TouchableOpacity onPress={() => handleDeleteGoal(goal.id, goal.name)} hitSlop={8}>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteGoal(goal.id, goal.name)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
                           <Trash2 size={18} color={Colors.textSecondary} />
                         </TouchableOpacity>
+                      </View>
+
+                      {/* Progress bar + percentage */}
+                      <View style={styles.goalBarRow}>
+                        <View style={styles.goalBar}>
+                          {progress > 0 && (
+                            <View
+                              style={[
+                                styles.goalBarFill,
+                                { width: `${Math.min(progress, 100)}%` as any, backgroundColor: color },
+                              ]}
+                            />
+                          )}
+                        </View>
+                        <Text style={[styles.goalBarPct, { color }]}>
+                          {Math.round(progress)}%
+                        </Text>
+                      </View>
+
+                      {/* Amount row */}
+                      <View style={styles.goalAmountRow}>
+                        <Text style={[styles.goalSavedAmt, { color }]}>
+                          {formatMoney(Number(goal.current_amount))} €
+                        </Text>
+                        <Text style={styles.goalTargetAmt}>
+                          {t.common.of} {formatMoney(Number(goal.target_amount))} €
+                        </Text>
+                        {isComplete ? (
+                          <Text style={[styles.goalRemainingTxt, { color: Colors.positive }]}>
+                            ✓ {t.goals.completed}
+                          </Text>
+                        ) : (
+                          remaining > 0 && (
+                            <Text style={styles.goalRemainingTxt}>
+                              {formatMoney(remaining)} € {t.goals.remaining}
+                            </Text>
+                          )
+                        )}
                       </View>
                     </TouchableOpacity>
                   );
@@ -611,13 +662,31 @@ const makeStyles = (Colors: any) => StyleSheet.create({
     padding: Spacing.md, marginBottom: Spacing.sm,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1,
   },
-  goalCardInner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  goalInfo: { flex: 1 },
-  goalName: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
-  goalDeadline: { fontSize: FontSize.xs, color: Colors.textSecondary, marginBottom: 6 },
-  goalAmounts: { flexDirection: 'row', alignItems: 'baseline' },
-  goalSaved: { fontSize: FontSize.md, fontWeight: '700' },
-  goalOf: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  goalCardTop: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, marginBottom: Spacing.md,
+  },
+  goalEmojiBox: {
+    width: 42, height: 42, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  goalEmoji: { fontSize: 22 },
+  goalTitleGroup: { flex: 1 },
+  goalName: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary, marginBottom: 3 },
+  goalDeadlineTxt: { fontSize: FontSize.xs, color: Colors.textSecondary },
+  goalBarRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm,
+  },
+  goalBar: {
+    flex: 1, height: 7, backgroundColor: Colors.border, borderRadius: 4, overflow: 'hidden',
+  },
+  goalBarFill: { height: '100%', borderRadius: 4 },
+  goalBarPct: { fontSize: 11, fontWeight: '700', minWidth: 34, textAlign: 'right' },
+  goalAmountRow: {
+    flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4,
+  },
+  goalSavedAmt: { fontSize: FontSize.md, fontWeight: '700' },
+  goalTargetAmt: { fontSize: FontSize.xs, color: Colors.textSecondary, flex: 1 },
+  goalRemainingTxt: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: '500' },
 
   deleteAllRow: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
